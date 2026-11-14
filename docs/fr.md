@@ -93,8 +93,8 @@ Le rapport Pool Price de l’API de l’AESO, version 1.1 :
   plus par requête). Quand un contrat sur le modèle commence plus tôt, ses jours
   aussi (400 jours au plus), trois requêtes au plus d’affilée, puis une minute d’écart.
 - Ensuite une requête par heure, 5 minutes après la fin de l’heure : le jour de
-  cette heure. Si l’heure n’est pas encore réglée, de nouveau 10 minutes plus
-  tard.
+  cette heure. Si l’heure est en retard, de nouveau 10, 20, 40 minutes plus
+  tard, puis toutes les heures tant qu’elle reste en retard.
 - Un jour passé répondu incomplet : redemandé une fois par jour.
 - Un jour complet n’est jamais redemandé. Un redémarrage, une reconnexion, une
   nouvelle clé ou le bouton ne demandent jamais plus tôt qu’une minute après la
@@ -106,8 +106,9 @@ Les réponses sont lues strictement : une heure n’est gardée que si ses débu
 UTC et heure des Rocheuses concordent, que l’heure est finie et que le prix est
 un nombre simple entre −1 000 et 3 000 CAD/MWh (les règles du marché le bornent
 aujourd’hui à 0 .. 999,99). Un prix vide (l’heure en cours et les suivantes, qui
-n’ont qu’une prévision) est inconnu ; de même un prix non numérique (comme « - »)
-pendant l’heure qui suit la fin de son heure. Une réponse n’efface jamais un prix gardé ;
+n’ont qu’une prévision) est inconnu , de même qu’un « - » (une heure en retard, quel que soit
+son âge) ; tout autre prix non numérique est inconnu pendant l’heure qui suit la
+fin de son heure, puis illisible. Une réponse n’efface jamais un prix gardé ;
 un prix corrigé le remplace.
 
 ## Erreurs et pauses
@@ -145,7 +146,9 @@ Le statut de l’intégration montre la dernière heure réglée gardée, une r�
 illisible (aucune de ses heures ne se lit alors que des heures sont attendues :
 non connecté, nouvel essai avec le délai croissant), les heures réglées qui
 seules ne se lisent pas (elles gardent le prix provisoire et sont redemandées un
-jour plus tard, les autres heures continuent à l’heure), la dernière
+jour plus tard, les autres heures continuent à l’heure), aucun nouveau prix du pool depuis plus de 3 heures
+(l’AESO en retard, ou sa réponse changée : non connecté, les contrats comptent
+le prix provisoire), la dernière
 vérification, la dernière erreur et la prochaine tentative, le calendrier non
 alimenté, le nombre de contrats sur le modèle, un `/data` impossible à écrire.
 `/data` illisible : relu toutes les 10 secondes, rien n’est demandé en

@@ -15,8 +15,9 @@
 // hour has ended, and the pool price is a plain decimal within -1,000 ..
 // 3,000 CAD/MWh. An empty pool price (the current hour, the next ones, which
 // only carry a forecast) is unknown, never zero. The forecast is never read.
-// A non-numeric price for an hour ended less than an hour ago (a "-" placeholder)
-// is "not settled yet", like an empty one. The UTC starts of the rows refused
+// A "-" placeholder is "not settled yet" (late), like an empty price, whatever
+// its age; any other non-numeric price is too during the hour after the end of
+// its hour, then unreadable. The UTC starts of the rows refused
 // are returned (`bad`), so one unreadable hour can be told apart from a broken
 // answer. A duplicate hour with another price leaves that hour unknown. Linear,
 // bounded in rows, no prototype involved.
@@ -104,7 +105,9 @@ export function parseAnswer(json, now) {
     // Not settled yet: the current hour and the next ones carry a forecast only.
     if (start + HOUR > now) continue;
     const raw = row.pool_price;
-    if (raw === '' || raw === null || raw === undefined) continue;
+    if (raw === null || raw === undefined || (typeof raw === 'string' && /^\s*-?\s*$/.test(raw))) {
+      continue;
+    }
     const price = priceOf(raw);
     if (price === undefined) {
       // Just ended: a placeholder until the AESO settles it.

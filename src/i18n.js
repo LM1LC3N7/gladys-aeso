@@ -75,7 +75,17 @@ export const T = {
    * The status: the last settled hour held, the last check and its error,
    * the calendar not fed, the contracts, a /data that cannot be written.
    */
-  status({ through, checkedAt, error, retryAt, calendar, contracts, dataError, unreadable = 0 }) {
+  status({
+    through,
+    checkedAt,
+    error,
+    retryAt,
+    calendar,
+    contracts,
+    dataError,
+    unreadable = 0,
+    stale,
+  }) {
     return both((lang) => {
       const en = lang === 'en';
       const parts = [];
@@ -87,6 +97,17 @@ export const T = {
         );
       } else {
         parts.push(en ? 'No pool price held yet.' : 'Aucun prix du pool encore gardé.');
+      }
+      if (stale !== undefined) {
+        parts.push(
+          through === undefined
+            ? en
+              ? 'The AESO answers but publishes no settled pool price: the contracts count the provisional price.'
+              : 'L’AESO répond mais ne publie aucun prix du pool réglé : les contrats comptent le prix provisoire.'
+            : en
+              ? `No new pool price published by the AESO for ${stale} hours (late, or its answer changed): the contracts count the provisional price meanwhile.`
+              : `Aucun nouveau prix du pool publié par l’AESO depuis ${stale} heures (retard, ou réponse changée) : les contrats comptent le prix provisoire en attendant.`,
+        );
       }
       if (checkedAt) {
         parts.push(

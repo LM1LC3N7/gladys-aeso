@@ -28,6 +28,11 @@
       interval would need a review of MIN/MAX_PRICE_MWH and of the hourly
       model (the calendar key keeps its 30-minute granularity for ever).
 - [ ] Corrections of a complete day are not read again (rare at the AESO).
+- [ ] Edge case (review r3, m11): a long AESO outage while Gladys keeps fewer
+      days of states than the outage lasts: the core purges the whole calendar
+      every night and the integration sends it again whole at each
+      connection (about 1,650 entries), with no effect on the costs (no state
+      to recompute there); it stops with the first hour published again.
 
 ## Decisions
 
@@ -64,6 +69,9 @@
 - The calendar is read back at each connection from the day of the last entry
   Gladys holds (`limit: 1`, then 20 days a call): the end lost by a restore is
   sent again, the beginning purged by the core every night never (review r2).
+- A late hour (empty or "-") is asked again 10, 20, 40 minutes later, then
+  hourly; no new price for 3 hours makes the status say so, not connected
+  (late AESO or a renamed field, review r3).
 - The placeholder of a just-ended hour ("" or "-") is a guess from gridstatus
   and the ETS report: check it on the first real answers.
 - No device and no scene trigger in 0.1.0 (the price goes through the

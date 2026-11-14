@@ -40,7 +40,7 @@ src/constants.js  manifest keys, bounds, schedule
 ## Module rules
 
 - **Never more than the source changes**: one request an hour (5 minutes after
-  the end of the hour), 10 minutes later while the hour is missing; never
+  the end of the hour), 10, 20, 40 minutes later, then hourly, while the hour is late; never
   sooner than a minute after the last request, restart included.
 - **Never guess a price**: an empty, unreadable or unsettled hour stays
   unknown; the forecast is never read; the core counts the provisional price

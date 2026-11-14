@@ -82,8 +82,13 @@ export const MAX_CONTRACTS = 100;
  * asks for it this long after the end of the hour.
  */
 export const PUBLISH_DELAY = 5 * 60_000;
-/** An hour expected and still absent from the answer: asked again 10 minutes later. */
-export const WAIT_PUBLICATION = 10 * 60_000;
+/**
+ * An hour expected and still absent from the answer (late at the AESO): asked
+ * again 10, 20, 40 minutes later, then every hour while it stays late.
+ */
+export const WAIT_STEPS = [10 * 60_000, 20 * 60_000, 40 * 60_000, 60 * 60_000];
+/** No new pool price for this long: the status says the AESO publishes nothing. */
+export const STALE_AFTER = 3 * 60 * 60_000;
 /** A past day the API answered incomplete: asked again a day later. */
 export const EMPTY_RETRY = 24 * 60 * 60_000;
 /** After a failed request: 5, 15, 30, 60 minutes, then every 3 hours (MAX_RETRY caps the steps). */

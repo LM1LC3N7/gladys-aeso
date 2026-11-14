@@ -12,12 +12,6 @@
     "to": ""
   },
   {
-    "name": "data: empty price refused instead of unknown",
-    "file": "src/data.js",
-    "from": "if (raw === '' || raw === null || raw === undefined) continue;",
-    "to": "if (raw === null || raw === undefined) continue;"
-  },
-  {
     "name": "data: price bounds removed",
     "file": "src/data.js",
     "from": "return Number.isFinite(price) && price >= MIN_PRICE_MWH && price <= MAX_PRICE_MWH",
@@ -188,8 +182,8 @@
   {
     "name": "app: past days asked every 10 minutes",
     "file": "src/app.js",
-    "from": "day >= addDays(today, -1) ? WAIT_PUBLICATION : EMPTY_RETRY",
-    "to": "WAIT_PUBLICATION"
+    "from": "day >= addDays(today, -1) ? WAIT_STEPS[step] : EMPTY_RETRY",
+    "to": "WAIT_STEPS[step]"
   },
   {
     "name": "app: all ranges in one check",
@@ -248,8 +242,8 @@
   {
     "name": "app: connected while failing",
     "file": "src/app.js",
-    "from": "connected: this.meta.checkedAt !== undefined && !this.lastError,",
-    "to": "connected: this.meta.checkedAt !== undefined,"
+    "from": "connected: this.meta.checkedAt !== undefined && !this.lastError && !stale,",
+    "to": "connected: this.meta.checkedAt !== undefined && !stale,"
   },
   {
     "name": "app: timers kept after stop",
@@ -388,5 +382,35 @@
     "file": "src/app.js",
     "from": "until > now && !this.heldAt(t)",
     "to": "false"
+  },
+  {
+    "name": "r3 m10: the wait of a late hour never grows",
+    "file": "src/app.js",
+    "from": "this.late.set(day, (this.late.get(day) ?? 0) + 1);",
+    "to": ""
+  },
+  {
+    "name": "r3 m10: no word on a stale feed",
+    "file": "src/app.js",
+    "from": "(through === undefined || now - through > STALE_AFTER)",
+    "to": "false"
+  },
+  {
+    "name": "r3 m10: a late placeholder taken for unreadable",
+    "file": "src/data.js",
+    "from": "(typeof raw === 'string' && /^\\s*-?\\s*$/.test(raw))",
+    "to": "raw === ''"
+  },
+  {
+    "name": "r3 m12: warning kept once the hour reads",
+    "file": "src/app.js",
+    "from": "until > now && !this.heldAt(t)",
+    "to": "until > now"
+  },
+  {
+    "name": "r3 m10: a day lacking only unreadable hours stays late",
+    "file": "src/app.js",
+    "from": "          if (this.done(day, expected, now)) {\n            this.incomplete.delete(day);\n            this.late.delete(day);\n          }\n        }\n",
+    "to": "        }\n"
   }
 ]

@@ -70,20 +70,51 @@ test('every hour, 5 minutes after its end: today only, never sooner', async () =
   assert.equal(source.count(), 3 + 24);
 });
 
-test('an hour late at the AESO: asked again 10 minutes later, not sooner, then back to hourly', async () => {
+test('an hour late at the AESO: asked again 10, 20, 40 minutes later, never sooner, then hourly', async () => {
   const { source, wait, clock } = await setup();
-  // The AESO settles the hours 20 minutes after their end now.
-  source.handler = (r) => answer(r.first, r.last, clock.now(), { lag: 20 * MINUTE });
+  // The AESO settles the hours an hour after their end now.
+  source.handler = (r) => answer(r.first, r.last, clock.now(), { lag: HOUR });
   await wait(45 * MINUTE + SECOND); // 12:05
   assert.equal(source.count(), 3);
   await wait(9 * MINUTE);
   assert.equal(source.count(), 3);
-  await wait(MINUTE + SECOND); // 12:15: still missing
+  await wait(MINUTE + SECOND); // 12:15: still late
   assert.equal(source.count(), 4);
-  await wait(10 * MINUTE); // 12:25: settled
+  await wait(19 * MINUTE); // 12:34
+  assert.equal(source.count(), 4);
+  await wait(MINUTE + SECOND); // 12:35: still late
   assert.equal(source.count(), 5);
-  await wait(30 * MINUTE); // 12:55: nothing more until 13:05
+  await wait(39 * MINUTE); // 13:14
   assert.equal(source.count(), 5);
+  await wait(MINUTE + SECOND); // 13:15: settled
+  assert.equal(source.count(), 6);
+  await wait(40 * MINUTE); // 13:55: nothing more until 14:05
+  assert.equal(source.count(), 6);
+});
+
+test('no new price for more than 3 hours (late, or a field renamed): said, not connected', async () => {
+  const { source, wait, status } = await setup();
+  source.handler = (r) => {
+    const body = answer(r.first, r.last, r.at);
+    for (const x of body.return['Pool Price Report']) {
+      x.price = x.pool_price;
+      delete x.pool_price;
+    }
+    return body;
+  };
+  await wait(2 * HOUR);
+  assert.equal(status().connected, true, 'two hours late: still within the usual');
+  await wait(2 * HOUR);
+  assert.equal(status().connected, false);
+  assert.match(status().message.en, /No new pool price published by the AESO for [34] hours/);
+  // About one request an hour once late, never every 10 minutes.
+  const n = source.count();
+  await wait(5 * HOUR);
+  assert.ok(source.count() - n <= 6, `${source.count() - n} requests in 5 hours`);
+  source.handler = undefined;
+  await wait(HOUR + MINUTE);
+  assert.equal(status().connected, true);
+  assert.doesNotMatch(status().message.en, /No new pool price/);
 });
 
 test('midnight: the last hour of yesterday asked at 00:05, alone', async () => {
@@ -801,16 +832,19 @@ test('one settled hour unreadable for good: the hourly rhythm goes on, said, ask
     return body;
   };
   await wait(45 * MINUTE + SECOND); // 12:05: the hour reads as N/A only after 13:00
-  await wait(HOUR); // 13:05: 'N/A' an hour after its end: unreadable
-  const n = source.count();
+  await wait(HOUR + 11 * MINUTE); // 13:16: 'N/A' an hour after its end: unreadable
   assert.match(status().message.en, /1 settled hour\(s\) unreadable/);
   assert.equal(status().connected, true);
+  // The next hour still arrives at 14:05, not held back by the bad one.
+  await wait(50 * MINUTE); // 14:06
+  assert.ok(app.heldAt(dayStart('2026-11-14') + 13 * HOUR), 'the 13:00 hour at 14:05');
+  const n = source.count();
   await wait(5 * HOUR);
   assert.ok(source.count() - n <= 6, `${source.count() - n} requests in 5 hours`);
   assert.equal(app.meta.failures, 0);
   // The next day, once its day of waiting is over: asked again.
   const before = source.count();
-  await wait(19 * HOUR); // 13:05 the next day
+  await wait(18 * HOUR); // 13:06 the next day
   const covering = () =>
     source.requests.slice(before).filter((r) => r.first <= '2026-11-14' && r.last >= '2026-11-14')
       .length;
@@ -828,4 +862,25 @@ test('an answer with nothing readable while every hour is held is no failure', a
   const ack = await gladys.fake.action('test_key', {});
   assert.match(ack.data.message.en, /Key accepted/);
   assert.equal(app.meta.failures, 0);
+});
+
+test('the warning goes once the unreadable hour reads again', async () => {
+  const bad = dayStart('2026-11-14') + 11 * HOUR;
+  const { source, wait, status } = await setup();
+  let broken = true;
+  source.handler = (r) => {
+    const body = answer(r.first, r.last, r.at);
+    for (const x of body.return['Pool Price Report']) {
+      if (broken && x.begin_datetime_utc === row(bad, '').begin_datetime_utc && x.pool_price) {
+        x.pool_price = 'N/A';
+      }
+    }
+    return body;
+  };
+  await wait(45 * MINUTE + SECOND);
+  await wait(HOUR + 11 * MINUTE); // 13:16: unreadable
+  assert.match(status().message.en, /1 settled hour\(s\) unreadable/);
+  broken = false;
+  await wait(HOUR); // 14:05: today asked, the hour reads
+  assert.doesNotMatch(status().message.en, /unreadable/);
 });

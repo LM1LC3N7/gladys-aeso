@@ -91,7 +91,8 @@ The Pool Price Report of the AESO API, version 1.1:
   request). When a contract on the template starts earlier, its days too (400
   days at most), three requests at most in a row, then a minute apart.
 - Then one request an hour, 5 minutes after the end of the hour: the day of
-  that hour. If the hour is not settled yet, again 10 minutes later.
+  that hour. If the hour is late, again 10, 20, 40 minutes later, then every
+  hour while it stays late.
 - A past day answered incomplete: asked again once a day.
 - A complete day is never asked again. A restart, a reconnection, a new key or
   the button never ask sooner than a minute after the last request.
@@ -102,8 +103,9 @@ Answers are read strictly: an hour is kept only when its UTC and Mountain start
 times agree, the hour has ended, and the price is a plain number between
 −1,000 and 3,000 CAD/MWh (the market rules bound it to 0 .. 999.99 today).
 An empty price (the current and next hours, which only carry a forecast) is
-unknown; so is a non-numeric one (such as "-") during the hour after the end of
-its hour. An answer never erases a price held; a corrected price replaces it.
+unknown, and so is a "-" (a late hour, whatever its age); any other
+non-numeric price is unknown during the hour after the end of its hour, then
+unreadable. An answer never erases a price held; a corrected price replaces it.
 
 ## Errors and pauses
 
@@ -137,7 +139,8 @@ The integration status shows the last settled hour held, an unreadable
 answer (no hour of it reads while hours are expected: not connected, retried
 with the growing back-off), the settled hours that alone do not read (they
 keep the provisional price and are asked again a day later, the other hours
-go on hourly), the last check, the
+go on hourly), no new pool price for more than 3 hours (the AESO late, or its
+answer changed: not connected, the contracts count the provisional price), the last check, the
 last error and the next attempt, the calendar not fed, the number of contracts
 on the template, a `/data` that cannot be written. `/data` unreadable: read
 again every 10 seconds, nothing asked meanwhile. The configuration not

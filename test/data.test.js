@@ -206,12 +206,19 @@ test('the tag of a refused key: 8 bits, salted; thousands of other keys share it
   }
 });
 
-test('a placeholder ("-") for an hour just ended is not settled yet; an hour later it is unreadable', () => {
+test('a "-" placeholder is late, never unreadable; other text is unreadable an hour after the end', () => {
   const t = Date.parse('2026-11-14T16:00:00Z'); // ends 17:00Z
-  const soon = parseAnswer({ 'Pool Price Report': [row(t, '-')] }, t + HOUR + 5 * 60_000);
+  for (const at of [t + HOUR + 5 * 60_000, t + 5 * HOUR]) {
+    const dash = parseAnswer(
+      { 'Pool Price Report': [row(t, '-'), row(t + HOUR, ' - ')] },
+      at + HOUR,
+    );
+    assert.equal(dash.refused, 0);
+    assert.equal(dash.bad.size, 0);
+  }
+  const soon = parseAnswer({ 'Pool Price Report': [row(t, 'N/A')] }, t + HOUR + 5 * 60_000);
   assert.equal(soon.refused, 0);
-  assert.equal(soon.bad.size, 0);
-  const late = parseAnswer({ 'Pool Price Report': [row(t, '-')] }, t + 2 * HOUR);
+  const late = parseAnswer({ 'Pool Price Report': [row(t, 'N/A')] }, t + 2 * HOUR);
   assert.equal(late.refused, 1);
   assert.deepEqual([...late.bad], [t]);
 });

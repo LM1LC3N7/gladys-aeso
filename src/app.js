@@ -51,7 +51,8 @@ import {
   STATUS_TIMEOUT,
   STORE_RETRY,
   TEMPLATE,
-  WAIT_PUBLICATION,
+  WAIT_STEPS,
+  STALE_AFTER,
 } from './constants.js';
 import { normalizeConfig, tagOf, validRefused } from './config.js';
 import { DataError, dayRecord, parseAnswer, perKwh, restoreDay, sameDay } from './data.js';
@@ -126,6 +127,8 @@ export class App {
     this.attemptMono = undefined;
     /** `{ until (wall), due (mono), code }` after a 429 or a quota. */
     this.pause = undefined;
+    /** local day -> answers in a row that left it lacking (the wait grows). */
+    this.late = new Map();
     /** Hour start -> wall time until which an hour the AESO answered unreadable waits. */
     this.unreadable = new Map();
     /** `{ salt, tag }` of the refused key (/data), and the key itself (memory only). */
@@ -473,7 +476,8 @@ export class App {
       if (this.done(day, expected, now)) continue;
       const at = this.incomplete.get(day);
       if (at !== undefined) {
-        const again = at + (day >= addDays(today, -1) ? WAIT_PUBLICATION : EMPTY_RETRY);
+        const step = Math.min((this.late.get(day) ?? 1) - 1, WAIT_STEPS.length - 1);
+        const again = at + (day >= addDays(today, -1) ? WAIT_STEPS[step] : EMPTY_RETRY);
         if (again > now) {
           wake = Math.min(wake, again);
           continue;
@@ -630,6 +634,13 @@ export class App {
             this.unreadable.set(start, now + EMPTY_RETRY);
           }
         }
+        // A day that lacks only such hours is not late: the next hour comes at its time.
+        for (const day of run) {
+          if (this.done(day, expected, now)) {
+            this.incomplete.delete(day);
+            this.late.delete(day);
+          }
+        }
       } catch (err) {
         if (gen !== this.generation) return { ok: false, error: 'restarted' };
         if (!(err instanceof SourceError)) throw err;
@@ -716,8 +727,14 @@ export class App {
         this.days.set(day, record);
         changed = true;
       }
-      if (this.done(day, expected, now)) this.incomplete.delete(day);
-      else this.incomplete.set(day, now);
+      if (this.done(day, expected, now)) {
+        this.incomplete.delete(day);
+        this.late.delete(day);
+      } else {
+        this.incomplete.set(day, now);
+        // The same day still lacking: each wait longer than the last.
+        this.late.set(day, (this.late.get(day) ?? 0) + 1);
+      }
     }
     return changed;
   }
@@ -727,6 +744,7 @@ export class App {
     const oldest = addDays(dayOf(now), -KEEP_DAYS);
     for (const day of this.days.keys()) if (day < oldest) this.days.delete(day);
     for (const day of this.incomplete.keys()) if (day < oldest) this.incomplete.delete(day);
+    for (const day of this.late.keys()) if (!this.incomplete.has(day)) this.late.delete(day);
     for (const day of Object.keys(this.sent)) if (day < oldest) delete this.sent[day];
     for (const [t, until] of this.unreadable) if (until <= now) this.unreadable.delete(t);
   }
@@ -972,9 +990,15 @@ export class App {
         if (price !== null && (through === undefined || end > through)) through = end;
       });
     }
+    // Checked, no error, and still no new price for 3 hours (late, or a field renamed).
+    const stale =
+      this.meta.checkedAt !== undefined &&
+      !this.lastError &&
+      (through === undefined || now - through > STALE_AFTER);
     return {
-      connected: this.meta.checkedAt !== undefined && !this.lastError,
+      connected: this.meta.checkedAt !== undefined && !this.lastError && !stale,
       message: T.status({
+        stale: stale ? Math.floor((now - (through ?? this.meta.checkedAt)) / HOUR) : undefined,
         through,
         checkedAt: this.meta.checkedAt,
         error: this.lastError,

@@ -29,6 +29,8 @@ the notes of the version's GitHub Release.
 - The calendar is read back from Gladys at each connection, from its last
   entry: days lost at its end (a database restored) are sent again, the days
   the core purges never.
+- A late hour is asked again 10, 20, 40 minutes later, then hourly; no new
+  price for 3 hours is said in the status (not connected).
 - One unreadable settled hour waits a day (said in the status) without slowing
   the other hours.
 - `countries: ["CA"]` in the manifest (Gladys 5.3.0 or later).
