@@ -1,0 +1,266 @@
+[
+  {
+    "name": "data: MPT start not checked",
+    "file": "src/data.js",
+    "from": "if (start === undefined || row.begin_datetime_mpt !== localText(start)) {",
+    "to": "if (start === undefined) {"
+  },
+  {
+    "name": "data: unsettled hour taken",
+    "file": "src/data.js",
+    "from": "if (start + HOUR > now) continue;",
+    "to": ""
+  },
+  {
+    "name": "data: empty price refused instead of unknown",
+    "file": "src/data.js",
+    "from": "if (raw === '' || raw === null || raw === undefined) continue;",
+    "to": "if (raw === null || raw === undefined) continue;"
+  },
+  {
+    "name": "data: price bounds removed",
+    "file": "src/data.js",
+    "from": "return Number.isFinite(price) && price >= MIN_PRICE_MWH && price <= MAX_PRICE_MWH",
+    "to": "return Number.isFinite(price)"
+  },
+  {
+    "name": "data: any number format accepted",
+    "file": "src/data.js",
+    "from": "if (!DECIMAL.test(text)) return undefined;",
+    "to": "if (!text) return undefined;"
+  },
+  {
+    "name": "data: conflicting hours kept",
+    "file": "src/data.js",
+    "from": "hours.delete(start);\n    refused += 1;",
+    "to": "refused += 1;"
+  },
+  {
+    "name": "data: too many rows accepted",
+    "file": "src/data.js",
+    "from": "if (rows.length > MAX_ROWS) throw",
+    "to": "if (false) throw"
+  },
+  {
+    "name": "data: responseCode ignored",
+    "file": "src/data.js",
+    "from": "String(json.responseCode) !== '200'",
+    "to": "false"
+  },
+  {
+    "name": "data: restored price unbounded",
+    "file": "src/data.js",
+    "from": "      price >= MIN_PRICE_MWH &&\n      price <= MAX_PRICE_MWH\n    ) {",
+    "to": "      true\n    ) {"
+  },
+  {
+    "name": "http: 401 not a refusal",
+    "file": "src/http.js",
+    "from": "if (status === 401) {",
+    "to": "if (status === 4010) {"
+  },
+  {
+    "name": "http: 403 taken for a refused key",
+    "file": "src/http.js",
+    "from": "throw new SourceError('forbidden'",
+    "to": "throw new SourceError('refused'"
+  },
+  {
+    "name": "http: quota 403 not a pause",
+    "file": "src/http.js",
+    "from": "if (/quota/i.test(text)) {",
+    "to": "if (false) {"
+  },
+  {
+    "name": "http: redirect followed",
+    "file": "src/http.js",
+    "from": "redirect: 'error',",
+    "to": "redirect: 'follow',"
+  },
+  {
+    "name": "http: no key header",
+    "file": "src/http.js",
+    "from": "[API_KEY_HEADER]: key,",
+    "to": ""
+  },
+  {
+    "name": "config: control characters accepted",
+    "file": "src/config.js",
+    "from": "!KEY.test(key)",
+    "to": "false"
+  },
+  {
+    "name": "app: no minimum gap",
+    "file": "src/app.js",
+    "from": "let gap = MIN_GAP;",
+    "to": "let gap = 0;"
+  },
+  {
+    "name": "app: back-off ignored",
+    "file": "src/app.js",
+    "from": "else if (this.meta.failures > 0) gap = this.interval(this.meta.failures);",
+    "to": ""
+  },
+  {
+    "name": "app: retired gap ignored",
+    "file": "src/app.js",
+    "from": "if (this.lastError === 'retired') gap = RETIRED_RETRY;",
+    "to": ""
+  },
+  {
+    "name": "app: pause ignored",
+    "file": "src/app.js",
+    "from": "if (this.pause && this.pause.due > due) due = this.pause.due;",
+    "to": ""
+  },
+  {
+    "name": "app: pause not capped",
+    "file": "src/app.js",
+    "from": "const pause = Math.min(Math.max(failure.retryAfter ?? PAUSE_DEFAULT, PAUSE_MIN), PAUSE_MAX);",
+    "to": "const pause = failure.retryAfter ?? PAUSE_DEFAULT;"
+  },
+  {
+    "name": "app: pause not restored",
+    "file": "src/app.js",
+    "from": "this.pause = { until: now + left, due: mono + left };",
+    "to": ""
+  },
+  {
+    "name": "app: attempt time not restored",
+    "file": "src/app.js",
+    "from": "this.attemptMono = mono - Math.min(now - this.meta.attemptAt, MAX_RETRY);",
+    "to": ""
+  },
+  {
+    "name": "app: attempt not saved before the request",
+    "file": "src/app.js",
+    "from": "    this.meta.attemptAt = this.now();\n    await this.save();",
+    "to": "    this.meta.attemptAt = this.now();"
+  },
+  {
+    "name": "app: refusal not restored",
+    "file": "src/app.js",
+    "from": "this.refused = validRefused(data.refused);",
+    "to": "this.refused = undefined;"
+  },
+  {
+    "name": "app: refused tag not compared",
+    "file": "src/app.js",
+    "from": "return tagOf(this.refused.salt, this.config.key) === this.refused.tag;",
+    "to": "return false;"
+  },
+  {
+    "name": "app: refused key still asked",
+    "file": "src/app.js",
+    "from": "      !this.config.problem &&\n      !this.keyRefused()",
+    "to": "      !this.config.problem"
+  },
+  {
+    "name": "app: a 401 refuses a key changed meanwhile",
+    "file": "src/app.js",
+    "from": "      if (this.config.key === key) {\n        const salt",
+    "to": "      if (true) {\n        const salt"
+  },
+  {
+    "name": "app: button success keeps the refusal",
+    "file": "src/app.js",
+    "from": "      if (this.refused && this.config.key === key) {",
+    "to": "      if (false) {"
+  },
+  {
+    "name": "app: malformed key sent",
+    "file": "src/app.js",
+    "from": "      this.config !== undefined &&\n      !this.config.problem &&",
+    "to": "      this.config !== undefined &&"
+  },
+  {
+    "name": "app: stale tz database ignored",
+    "file": "src/app.js",
+    "from": "      this.tzCurrent &&\n",
+    "to": ""
+  },
+  {
+    "name": "app: incomplete wait removed",
+    "file": "src/app.js",
+    "from": "if (again > now) {",
+    "to": "if (false) {"
+  },
+  {
+    "name": "app: past days asked every 10 minutes",
+    "file": "src/app.js",
+    "from": "day >= addDays(today, -1) ? WAIT_PUBLICATION : EMPTY_RETRY",
+    "to": "WAIT_PUBLICATION"
+  },
+  {
+    "name": "app: all ranges in one check",
+    "file": "src/app.js",
+    "from": "App.chunks(days).slice(0, maxRuns)",
+    "to": "App.chunks(days)"
+  },
+  {
+    "name": "app: held price erased by an answer",
+    "file": "src/app.js",
+    "from": "const price = fresh.prices[k] === null ? held.prices[k] : fresh.prices[k];",
+    "to": "const price = fresh.prices[k];"
+  },
+  {
+    "name": "app: calendar per MWh",
+    "file": "src/app.js",
+    "from": "price: perKwh(price),",
+    "to": "price,"
+  },
+  {
+    "name": "app: calendar 403 not told apart",
+    "file": "src/app.js",
+    "from": "issue: status === 403 ? 'refused' : 'error'",
+    "to": "issue: 'error'"
+  },
+  {
+    "name": "app: getConfig not retried",
+    "file": "src/app.js",
+    "from": "        this.readConfig(gen).catch((e) => this.logger.error(`Config failed (${e?.name})`));",
+    "to": ""
+  },
+  {
+    "name": "app: config error not in the status",
+    "file": "src/app.js",
+    "from": "    if (this.configRetryAt !== undefined) {\n      return { connected: false, message: T.configUnreadable(this.configRetryAt) };\n    }",
+    "to": ""
+  },
+  {
+    "name": "app: /data unreadable not retried",
+    "file": "src/app.js",
+    "from": "            this.load(gen)\n",
+    "to": "            Promise.resolve()\n"
+  },
+  {
+    "name": "app: button ignores the gap",
+    "file": "src/app.js",
+    "from": "if (this.attemptMono !== undefined && mono - this.attemptMono < MIN_GAP) {",
+    "to": "if (false) {"
+  },
+  {
+    "name": "app: button ignores the pause",
+    "file": "src/app.js",
+    "from": "if (this.pause && this.pause.due > mono) return T.testPaused(this.pause.until);",
+    "to": ""
+  },
+  {
+    "name": "app: connected while failing",
+    "file": "src/app.js",
+    "from": "connected: this.meta.checkedAt !== undefined && !this.lastError,",
+    "to": "connected: this.meta.checkedAt !== undefined,"
+  },
+  {
+    "name": "app: timers kept after stop",
+    "file": "src/app.js",
+    "from": "    this.running = false;\n    this.generation += 1;\n    this.clearTimers();",
+    "to": "    this.running = false;\n    this.generation += 1;"
+  },
+  {
+    "name": "app: old days kept",
+    "file": "src/app.js",
+    "from": "if (!DAY_PATTERN.test(day) || day < oldest || day > today) continue;",
+    "to": "if (!DAY_PATTERN.test(day)) continue;"
+  }
+]

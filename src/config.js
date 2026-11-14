@@ -1,45 +1,45 @@
 // -----------------------------------------------------------------------------
-// Integration configuration.
-//
-// The configuration is filled in by the user in Gladys, from the `config_schema`
-// declared in `gladys-assistant-integration.json`. The SDK fetches it for you
-// (`gladys.getConfig()`) and notifies you of every change through
-// `gladys.onConfigUpdated()`.
-//
-// This module only provides defaults and normalizes the received object, so the
-// rest of the code never has to deal with `undefined`.
+// The configuration of the form, normalized: the AESO API key (the "public"
+// subscription key of the AESO developer portal). Nothing here talks to the
+// network, and the key is never part of a message.
 // -----------------------------------------------------------------------------
 
-// Defaults: they MUST stay consistent with the `default` values declared in the
-// `config_schema` of the manifest.
-export const DEFAULT_CONFIG = {
-  latitude: 48.8566, // Paris
-  longitude: 2.3522,
-  unit: 'celsius', // 'celsius' | 'fahrenheit'
-  // Seconds between two reads of the polled sensors. Gladys polls at most once
-  // a minute: slower intervals are applied by skipping polls (see
-  // createPoller in src/devices/index.js).
-  poll_frequency: 300,
-  // Reserved key (NOT in config_schema): because the manifest declares both
-  // 'local' and 'cloud' in its `transports` field, Gladys shows a standard
-  // "Prefer the local connection" toggle and sends the user's choice here.
-  // Read-only for the integration; defaults to true.
-  GLADYS_PREFER_LOCAL: true,
-};
+import { createHash } from 'node:crypto';
+import { CONFIG_KEY, MAX_KEY_LENGTH, MIN_KEY_LENGTH } from './constants.js';
+
+/** Printable ASCII without space: never a control character (CR, LF, tab) in a header. */
+const KEY = /^[\x21-\x7e]+$/;
+
+/** `{ key, problem }`: `problem` ('missing', 'malformed') keeps anything from being sent. */
+export function normalizeConfig(raw) {
+  const value = raw && typeof raw === 'object' ? raw[CONFIG_KEY] : undefined;
+  if (value === undefined || value === null) return { key: '', problem: 'missing' };
+  if (typeof value !== 'string') return { key: '', problem: 'malformed' };
+  const key = value.trim();
+  if (!key) return { key: '', problem: 'missing' };
+  if (key.length < MIN_KEY_LENGTH || key.length > MAX_KEY_LENGTH || !KEY.test(key)) {
+    return { key: '', problem: 'malformed' };
+  }
+  return { key, problem: undefined };
+}
 
 /**
- * Merge the user config with the defaults.
- * @param {Record<string, unknown>} raw config returned by the SDK
+ * 8 bits of a salted hash of a refused key: enough to keep a restart from
+ * sending the same key again, nothing to find it back from (one key in 256
+ * shares any tag).
  */
-export function normalizeConfig(raw = {}) {
-  return {
-    ...DEFAULT_CONFIG,
-    ...raw,
-    // Force the types: config may arrive as strings from a form.
-    latitude: Number(raw.latitude ?? DEFAULT_CONFIG.latitude),
-    longitude: Number(raw.longitude ?? DEFAULT_CONFIG.longitude),
-    poll_frequency: Number(raw.poll_frequency ?? DEFAULT_CONFIG.poll_frequency),
-    // The preference is a boolean; anything but an explicit false means true.
-    GLADYS_PREFER_LOCAL: raw.GLADYS_PREFER_LOCAL !== false,
-  };
+export const tagOf = (salt, key) =>
+  createHash('sha256').update(`${salt}\u0000${key}`, 'utf8').digest()[0];
+
+/** A refusal read back from /data: `{ salt, tag }`, or undefined. */
+export function validRefused(value) {
+  return value &&
+    typeof value === 'object' &&
+    typeof value.salt === 'string' &&
+    /^[0-9a-f]{32}$/.test(value.salt) &&
+    Number.isInteger(value.tag) &&
+    value.tag >= 0 &&
+    value.tag < 256
+    ? { salt: value.salt, tag: value.tag }
+    : undefined;
 }

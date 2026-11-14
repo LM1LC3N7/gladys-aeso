@@ -1,61 +1,126 @@
-# Demo Devices Template
+# AESO pool price for Gladys Assistant
 
-This is the user documentation of the integration. Gladys re-hosts this file
-and shows a permanent **Documentation** link to it in the Configuration screen
-(in the user's language, with English as the fallback) — it is when
-configuring that the user needs it most. Keep the short onboarding hints in
-the `section` blocks of the manifest `config_schema`; put the long
-step-by-step (screenshots, troubleshooting…) here.
+**Unofficial integration, not affiliated with the AESO (Alberta Electric System
+Operator). Never tested with a real AESO key nor a real Gladys energy contract
+yet.**
 
-## What you get
+For Alberta households on a **floating (variable) retail rate** that follows
+the hourly pool price. This integration reads the pool price of every settled
+hour, feeds the Gladys energy calendar `spot-ca-ab` and offers the contract
+template **"AESO pool price (floating rate)"**. Wholesale prices are not the
+Regulated Rate Option (RRO) nor a fixed-rate contract: this template is for a
+rate that tracks the pool price.
 
-Six demo devices show up after installation: a weather station (real data
-from Open-Meteo), a switch, a dimmable light, a smart plug with power
-metering, a motion sensor and a camera.
+## Get a key (free)
 
-## Configuration
+1. Sign up on the AESO developer portal, <https://developer-apim.aeso.ca/>
+   (signing up means accepting the AESO terms of use: personal use).
+2. Subscribe to the **public** product and copy its **primary key**.
+3. In Gladys, paste it in the **AESO API key** field of the integration and
+   save. Press **Test the key**: it reads today's settled hours once and tells
+   you the last one.
 
-1. Open the **Configuration** tab of the integration.
-2. Set the **latitude** and **longitude** the demo weather station should
-   observe (they default to Paris), and pick your temperature unit.
-   The **refresh interval** sets how often the weather station and the
-   plug's power are read: every 5 minutes by default, every minute at most.
-3. Save: the devices appear in the **Discovery** tab, ready to be added.
+The key is kept by Gladys in its database, never shown again, sent only to the
+AESO (`apimgw.aeso.ca`) in the `API-KEY` header, never in a URL, a log, the
+status or `/data`.
 
-The **Prefer the local connection** toggle drives the demo plug: it reports
-the channel it actually uses as a badge (local or cloud), with an orange dot
-when it runs degraded (local refused, cloud fallback).
+## Create the contract
 
-## Actions
+In Gladys, **Energy monitoring → Contracts → New contract**, pick **AESO pool
+price (floating rate)** and fill in:
 
-- **Test the weather provider** — performs a live request to Open-Meteo and
-  shows the current temperature and humidity under the button.
-- **Identify a device** — pick one of your devices in the list and it will
-  signal itself (the demo light "blinks" in the logs).
+| Input                     | What to type                                                                                                                                 |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Retailer adder per kWh    | The adder (margin) of your floating-rate retailer, CAD/kWh, before GST. 0 counts the pool price alone.                                       |
+| Provisional price per kWh | **Required.** Your usual energy price, adder included, before GST: counted for an hour whose pool price is not published yet, then replaced. |
+| Delivery charges per kWh  | Your variable distribution and transmission charges and riders, CAD/kWh, before GST. 0 leaves them out.                                      |
+| Fixed charges per month   | Your fixed administration and delivery charges of a month, before GST.                                                                       |
+| GST                       | 5 % in Alberta.                                                                                                                              |
 
-## Scenes
+Per kWh: (pool price + adder) + delivery, then GST on everything, fixed charges
+included. A negative pool price (not allowed by today's market rules) would be
+counted as published.
 
-The integration adds its own cards to the scene editor (Gladys 5.1 or
-later), under the **Integrations** category:
+## How the price of an hour gets there
 
-- **Motion detected** (trigger) — starts the scene when a demo motion sensor
-  sees something move. Optionally pick the sensor and what moved (person,
-  animal); left empty, any detection matches. The following actions can
-  read what moved with `{{triggerEvent.data.target}}`.
-- **Identify a device** (action) — makes the chosen device signal itself.
-  It returns whether the device could signal itself, so the following
-  actions can depend on it.
+The pool price of an hour is the average of its 60 one-minute system marginal
+prices: it is known only once the hour has ended. So:
 
-## Dashboard
+- during an hour, and for a few minutes after it, Gladys counts the
+  **provisional price** of the contract (labelled "Provisional (hour not
+  settled yet)"); the price widget and the "current price" scene condition show
+  that provisional price too;
+- 5 minutes after the end of each hour, the integration asks the AESO for the
+  settled hours of the day and writes the new one to the calendar; Gladys then
+  recomputes the costs from that hour with the real price (at most once every
+  10 minutes per calendar, by the Gladys core);
+- while the integration is stopped, the provisional price stays counted; when
+  it comes back, it reads the missing hours and Gladys recomputes them.
 
-Add the **Demo status** widget to a dashboard: it shows the live
-temperature of the weather station and the power of the office plug, the
-connection the plug currently uses (orange when degraded) and the observed
-location. Its **Identify the light** button makes the demo light signal
-itself.
+A missing hour is never guessed by the integration nor written as 0: it stays
+unknown in the calendar, and Gladys counts the provisional price you chose.
+The AESO forecast pool price is never used.
 
-## Troubleshooting
+## Source and requests
 
-The integration logs everything it does: check the integration logs from the
-Gladys UI (or `docker logs` on the host) with `LOG_LEVEL=debug` for the full
-detail.
+The Pool Price Report of the AESO API, version 1.1:
+`https://apimgw.aeso.ca/public/poolprice-api/v1.1/price/poolPrice?startDate=…&endDate=…`
+(the days of Mountain time, both included).
+
+- At the first start: the last 35 days, in two requests (31 days at most per
+  request). When a contract on the template starts earlier, its days too (400
+  days at most), three requests at most in a row, then a minute apart.
+- Then one request an hour, 5 minutes after the end of the hour: the day of
+  that hour. If the hour is not settled yet, again 10 minutes later.
+- A past day answered incomplete: asked again once a day.
+- A complete day is never asked again. A restart, a reconnection, a new key or
+  the button never ask sooner than a minute after the last request.
+- One request at a time, 20 seconds and 1 MB at most, the integration's own
+  User-Agent (`gladys-aeso/<version>`), no redirect followed.
+
+Answers are read strictly: an hour is kept only when its UTC and Mountain start
+times agree, the hour has ended, and the price is a plain number between
+−1,000 and 3,000 CAD/MWh (the market rules bound it to 0 .. 999.99 today).
+An empty price (the current and next hours, which only carry a forecast) is
+unknown. An answer never erases a price held; a corrected price replaces it.
+
+## Errors and pauses
+
+| Answer                                                | What the integration does                                                                                                                                                                                                                             |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 401                                                   | The key is refused: no automatic request any more, even after a restart, until the key is changed or the **Test the key** button succeeds. Only 8 bits of a salted hash of the refused key are kept in `/data` (many keys share them), never the key. |
+| 403 "quota"                                           | A pause until the quota comes back (the time the AESO gives, 1 minute to 6 hours, 10 minutes when none); not a refused key.                                                                                                                           |
+| Other 403                                             | Not a refused key: retried after 5, 15, 30, 60 minutes, then every 3 hours.                                                                                                                                                                           |
+| 429                                                   | A pause for the `Retry-After` time (1 minute to 6 hours, 10 minutes when absent), kept in `/data` across a restart. The button waits for it too.                                                                                                      |
+| 5xx, timeout, network, unreadable or too large answer | Retried after 5, 15, 30, 60 minutes, then every 3 hours.                                                                                                                                                                                              |
+| 404 or 410                                            | The version 1.1 may be retired: asked again every 6 hours; update the integration.                                                                                                                                                                    |
+
+A key changed while the integration was stopped shares those 8 bits with the
+refused one once in 256: it is then held as refused too until you press **Test
+the key** (a key changed while it runs is always tried).
+
+The calendar owned by another integration (Gladys refuses it): said in the
+status, the prices are still read.
+
+## Time zone
+
+Alberta keeps UTC-6 all year since 1 November 2026. The settlement days follow
+the time zone database of the integration's Node.js (2026e or later knows the
+change); with an older one, every winter hour would be an hour off the AESO's
+own Mountain times, so the integration asks nothing and says so. The history
+before November 2026 keeps its 23- and 25-hour days.
+
+## Status
+
+The integration status shows the last settled hour held, the last check, the
+last error and the next attempt, the calendar not fed, the number of contracts
+on the template, a `/data` that cannot be written. `/data` unreadable: read
+again every 10 seconds, nothing asked meanwhile. The configuration not
+readable from Gladys: asked again after 10 seconds, then twice as long each
+time up to 5 minutes.
+
+## Limits
+
+- Never tested with a real key nor a real contract.
+- Corrections the AESO makes to a day already complete are not read again.
+- No device, no scene trigger: the price is used through the contract.

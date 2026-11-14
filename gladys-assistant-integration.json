@@ -1,177 +1,228 @@
 {
   "manifest_version": 1,
-  "type": "device",
-  "name": "Demo Devices Template",
+  "type": "provider",
+  "name": "AESO pool price (Alberta)",
   "description": {
-    "en": "Starter template showing sensors, a switch, a dimmable light and a smart plug.",
-    "fr": "Template de démarrage : capteurs, interrupteur, lampe variable et prise connectée."
+    "en": "Unofficial: the Alberta hourly pool price (AESO) for your energy contract.",
+    "fr": "Non officiel : prix horaire du pool de l’Alberta (AESO) pour votre contrat."
   },
-  "version": "1.0.0",
-  "docker_image": "ghcr.io/gladysassistant/integration-template-js:1.0.0",
-  "gladys_version": ">=5.1.0",
-  "cover_image": "https://raw.githubusercontent.com/GladysAssistant/integration-template-js/master/cover.png",
-  "categories": ["lighting", "security", "environment"],
-  "transports": ["local", "cloud"],
+  "version": "0.1.0",
+  "docker_image": "ghcr.io/lm1lc3n7/gladys-aeso:0.1.0",
+  "gladys_version": ">=5.3.0",
+  "cover_image": "https://raw.githubusercontent.com/LM1LC3N7/gladys-aeso/main/cover.png",
+  "categories": ["energy"],
+  "countries": ["CA"],
+  "transports": ["cloud"],
   "config_schema": [
     {
       "key": "intro",
       "type": "section",
-      "label": { "en": "Getting started", "fr": "Pour commencer" },
+      "label": {
+        "en": "AESO pool price",
+        "fr": "Prix du pool de l’AESO"
+      },
       "description": {
-        "en": "The demo weather station reads real data from the free Open-Meteo API: pick the coordinates to observe. No account, no API key.",
-        "fr": "La station météo de démonstration lit de vraies données via l'API gratuite Open-Meteo : choisissez les coordonnées à observer. Pas de compte, pas de clé d'API."
+        "en": "Unofficial, not affiliated with the AESO (Alberta Electric System Operator). For Alberta households on a floating (variable) retail rate that follows the pool price. The integration reads the hourly pool price from the official AESO API with your free API key, feeds it to the Gladys energy calendar spot-ca-ab and offers the \"AESO pool price\" contract template (pool price plus your retailer adder, delivery per kWh, fixed charges, GST). The pool price of an hour is known only once the hour has ended: until then Gladys counts the provisional price you type in the contract, then recomputes the cost with the real price. Get a key: sign up on developer-apim.aeso.ca, subscribe to the \"public\" product, copy its primary key here. Read-only.",
+        "fr": "Non officiel, sans lien avec l’AESO (Alberta Electric System Operator). Pour les foyers albertains au tarif de détail variable qui suit le prix du pool. L’intégration lit le prix horaire du pool sur l’API officielle de l’AESO avec votre clé d’API gratuite, l’envoie au calendrier d’énergie spot-ca-ab de Gladys et propose le modèle de contrat « Prix du pool de l’AESO » (prix du pool plus la marge de votre fournisseur, transport au kWh, frais fixes, TPS). Le prix du pool d’une heure n’est connu qu’une fois l’heure finie : en attendant, Gladys compte le prix provisoire saisi dans le contrat, puis recalcule le coût avec le vrai prix. Obtenir une clé : inscrivez-vous sur developer-apim.aeso.ca, abonnez-vous au produit « public », copiez ici sa clé primaire. Lecture seule."
       },
       "links": [
         {
-          "url": "https://open-meteo.com/en/docs",
-          "label": { "en": "Open-Meteo documentation", "fr": "Documentation Open-Meteo" }
+          "url": "https://developer-apim.aeso.ca/",
+          "label": {
+            "en": "AESO API portal",
+            "fr": "Portail d’API de l’AESO"
+          }
+        },
+        {
+          "url": "https://github.com/LM1LC3N7/gladys-aeso/blob/main/docs/en.md",
+          "label": {
+            "en": "Guide (English)",
+            "fr": "Guide (anglais)"
+          }
+        },
+        {
+          "url": "https://github.com/LM1LC3N7/gladys-aeso/blob/main/docs/fr.md",
+          "label": {
+            "en": "Guide (French)",
+            "fr": "Guide (français)"
+          }
         }
       ]
     },
     {
-      "key": "latitude",
-      "type": "number",
-      "label": { "en": "Latitude", "fr": "Latitude" },
-      "description": {
-        "en": "Latitude used for the demo weather sensor.",
-        "fr": "Latitude utilisée par le capteur météo de démonstration."
-      },
-      "placeholder": { "en": "e.g. 48.8566", "fr": "ex. 48.8566" },
+      "key": "api_key",
+      "type": "secret",
       "required": true,
-      "default": 48.8566,
-      "min": -90,
-      "max": 90
-    },
-    {
-      "key": "longitude",
-      "type": "number",
-      "label": { "en": "Longitude", "fr": "Longitude" },
-      "description": {
-        "en": "Longitude used for the demo weather sensor.",
-        "fr": "Longitude utilisée par le capteur météo de démonstration."
+      "label": {
+        "en": "AESO API key",
+        "fr": "Clé d’API de l’AESO"
       },
-      "placeholder": { "en": "e.g. 2.3522", "fr": "ex. 2.3522" },
-      "required": true,
-      "default": 2.3522,
-      "min": -180,
-      "max": 180
-    },
-    {
-      "key": "unit",
-      "type": "select",
-      "label": { "en": "Temperature unit", "fr": "Unité de température" },
-      "required": false,
-      "default": "celsius",
-      "options": [
-        { "value": "celsius", "label": { "en": "Celsius", "fr": "Celsius" } },
-        { "value": "fahrenheit", "label": { "en": "Fahrenheit", "fr": "Fahrenheit" } }
-      ]
-    },
-    {
-      "key": "poll_frequency",
-      "type": "number",
-      "label": { "en": "Refresh interval (s)", "fr": "Intervalle de rafraîchissement (s)" },
       "description": {
-        "en": "How often sensors are polled, in seconds (one minute minimum).",
-        "fr": "Fréquence d'interrogation des capteurs, en secondes (une minute minimum)."
-      },
-      "required": false,
-      "default": 300,
-      "min": 60,
-      "max": 3600
+        "en": "The primary key of your \"public\" subscription on developer-apim.aeso.ca. Kept by Gladys in its database, never shown again, sent only to the AESO (apimgw.aeso.ca) in the API-KEY header.",
+        "fr": "La clé primaire de votre abonnement « public » sur developer-apim.aeso.ca. Gardée par Gladys dans sa base, jamais réaffichée, envoyée seulement à l’AESO (apimgw.aeso.ca) dans l’en-tête API-KEY."
+      }
     }
   ],
   "actions": [
     {
-      "key": "test_weather",
-      "label": { "en": "Test the weather provider", "fr": "Tester le fournisseur météo" },
-      "timeout_seconds": 30
-    },
-    {
-      "key": "identify",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "fields": [
-        {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
-        }
-      ]
+      "key": "test_key",
+      "timeout_seconds": 60,
+      "label": {
+        "en": "Test the key",
+        "fr": "Tester la clé"
+      },
+      "description": {
+        "en": "Reads the settled hours of today with the saved key (at most once a minute). Save the configuration first.",
+        "fr": "Lit les heures réglées d’aujourd’hui avec la clé enregistrée (au plus une fois par minute). Enregistrez d’abord la configuration."
+      }
     }
   ],
-  "scene_triggers": [
-    {
-      "key": "motion_detected",
-      "label": { "en": "Motion detected", "fr": "Mouvement détecté" },
-      "description": {
-        "en": "A demo motion sensor saw a person or an animal move.",
-        "fr": "Un détecteur de démonstration a vu bouger une personne ou un animal."
-      },
-      "fields": [
-        {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Sensor", "fr": "Détecteur" }
+  "energy_contracts": {
+    "templates": [
+      {
+        "key": "aeso-pool-price",
+        "name": {
+          "en": "AESO pool price (floating rate)",
+          "fr": "Prix du pool de l’AESO (tarif variable)"
         },
-        {
-          "key": "target",
-          "type": "multi_select",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" },
-          "options": [
-            { "value": "person", "label": { "en": "Person", "fr": "Personne" } },
-            { "value": "animal", "label": { "en": "Animal", "fr": "Animal" } }
+        "description": {
+          "en": "For a floating retail rate that follows the Alberta pool price: the hourly pool price plus your retailer adder, the variable delivery charges per kWh, your fixed monthly charges and GST. Priced by Gladys from the spot-ca-ab calendar this integration feeds. The pool price of an hour is published once the hour has ended: until then the provisional price you type here is counted, then the cost is recomputed with the real price (the integration must be running). Not the Regulated Rate Option (RRO).",
+          "fr": "Pour un tarif de détail variable qui suit le prix du pool de l’Alberta : le prix horaire du pool plus la marge de votre fournisseur, les frais de transport variables au kWh, vos frais fixes mensuels et la TPS. Tarifé par Gladys depuis le calendrier spot-ca-ab que l’intégration alimente. Le prix du pool d’une heure est publié une fois l’heure finie : en attendant, le prix provisoire saisi ici est compté, puis le coût est recalculé avec le vrai prix (l’intégration doit tourner). Pas le tarif réglementé (RRO)."
+        },
+        "country": "CA",
+        "currency": "CAD",
+        "timezone": "America/Edmonton",
+        "pricing_mode": "rules",
+        "version": "2026-11-14",
+        "calendars": ["spot-ca-ab"],
+        "inputs": [
+          {
+            "key": "adder_cad_kwh",
+            "type": "number",
+            "unit": "CAD/kWh",
+            "default": 0,
+            "label": {
+              "en": "Retailer adder per kWh",
+              "fr": "Marge du fournisseur au kWh"
+            },
+            "description": {
+              "en": "Added to every hourly pool price (the adder or margin of your floating-rate retailer), before GST. 0 counts the pool price alone.",
+              "fr": "Ajoutée à chaque prix horaire du pool (la marge de votre fournisseur au tarif variable), hors TPS. 0 compte le prix du pool seul."
+            }
+          },
+          {
+            "key": "provisional_cad_kwh",
+            "type": "number",
+            "unit": "CAD/kWh",
+            "required": true,
+            "label": {
+              "en": "Provisional price per kWh",
+              "fr": "Prix provisoire au kWh"
+            },
+            "description": {
+              "en": "Counted for an hour whose pool price is not published yet (the current hour, or while the integration is stopped), then replaced by the real price. Your usual energy price, adder included, before GST.",
+              "fr": "Compté pour une heure dont le prix du pool n’est pas encore publié (l’heure en cours, ou pendant un arrêt de l’intégration), puis remplacé par le vrai prix. Votre prix habituel de l’énergie, marge comprise, hors TPS."
+            }
+          },
+          {
+            "key": "delivery_cad_kwh",
+            "type": "number",
+            "unit": "CAD/kWh",
+            "default": 0,
+            "label": {
+              "en": "Delivery charges per kWh",
+              "fr": "Frais de transport au kWh"
+            },
+            "description": {
+              "en": "The variable distribution and transmission charges and riders of your bill, before GST. 0 leaves them out.",
+              "fr": "Les frais variables de distribution et de transport et les avenants de votre facture, hors TPS. 0 les laisse de côté."
+            }
+          },
+          {
+            "key": "fixed_cad_month",
+            "type": "number",
+            "unit": "CAD/month",
+            "default": 0,
+            "label": {
+              "en": "Fixed charges per month",
+              "fr": "Frais fixes par mois"
+            },
+            "description": {
+              "en": "The fixed administration and delivery charges of a month, before GST.",
+              "fr": "Les frais fixes d’administration et de transport d’un mois, hors TPS."
+            }
+          },
+          {
+            "key": "gst_percent",
+            "type": "number",
+            "unit": "%",
+            "default": 5,
+            "label": {
+              "en": "GST",
+              "fr": "TPS"
+            },
+            "description": {
+              "en": "Goods and services tax on everything above (5 % in Alberta).",
+              "fr": "Taxe sur les produits et services sur tout ce qui précède (5 % en Alberta)."
+            }
+          }
+        ],
+        "tariff": {
+          "tariff_version": 1,
+          "calendars": ["spot-ca-ab"],
+          "components": [
+            {
+              "key": "energy",
+              "kind": "consumption",
+              "label": "Pool price",
+              "rules": [
+                {
+                  "label": "Pool price",
+                  "price_from_calendar": "spot-ca-ab",
+                  "offset": "{{input:adder_cad_kwh}}"
+                }
+              ],
+              "fallback": {
+                "label": "Provisional (hour not settled yet)",
+                "price": "{{input:provisional_cad_kwh}}"
+              }
+            },
+            {
+              "key": "delivery",
+              "kind": "consumption",
+              "label": "Delivery",
+              "rules": [
+                {
+                  "label": "Delivery",
+                  "price": "{{input:delivery_cad_kwh}}"
+                }
+              ]
+            },
+            {
+              "key": "fixed",
+              "kind": "fixed",
+              "label": "Fixed charges",
+              "amount": "{{input:fixed_cad_month}}",
+              "per": "month"
+            },
+            {
+              "key": "gst",
+              "kind": "tax",
+              "label": "GST",
+              "rate": "{{input:gst_percent}}",
+              "applies_to": ["energy", "delivery", "fixed"]
+            }
           ]
         }
-      ],
-      "variables": [
-        {
-          "key": "target",
-          "type": "string",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" }
-        }
-      ]
-    }
-  ],
-  "scene_actions": [
-    {
-      "key": "identify_device",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "description": {
-        "en": "Make a device signal itself (the demo light blinks).",
-        "fr": "Fait se signaler un appareil (la lampe de démonstration clignote)."
-      },
-      "timeout_seconds": 15,
-      "fields": [
-        {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
-        }
-      ],
-      "outputs": [
-        {
-          "key": "signalled",
-          "type": "boolean",
-          "label": { "en": "Device signalled", "fr": "Appareil signalé" }
-        }
-      ]
-    }
-  ],
-  "widgets": [
-    {
-      "key": "demo_status",
-      "label": { "en": "Demo status", "fr": "État de la démo" },
-      "description": {
-        "en": "Live temperature and plug power, plug connection and observed location.",
-        "fr": "Température et puissance en direct, connexion de la prise, position observée."
-      },
-      "icon": "activity",
-      "action_timeout_seconds": 15
-    }
-  ]
+      }
+    ],
+    "calendars": [
+      {
+        "key": "spot-ca-ab",
+        "granularity": "thirty_minutes",
+        "currency": "CAD",
+        "timezone": "America/Edmonton"
+      }
+    ]
+  }
 }
