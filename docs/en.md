@@ -102,7 +102,8 @@ Answers are read strictly: an hour is kept only when its UTC and Mountain start
 times agree, the hour has ended, and the price is a plain number between
 −1,000 and 3,000 CAD/MWh (the market rules bound it to 0 .. 999.99 today).
 An empty price (the current and next hours, which only carry a forecast) is
-unknown. An answer never erases a price held; a corrected price replaces it.
+unknown; so is a non-numeric one (such as "-") during the hour after the end of
+its hour. An answer never erases a price held; a corrected price replaces it.
 
 ## Errors and pauses
 
@@ -133,8 +134,10 @@ before November 2026 keeps its 23- and 25-hour days.
 ## Status
 
 The integration status shows the last settled hour held, an unreadable
-answer (hours whose times or prices do not read while an expected hour lacks:
-not connected, retried with the growing back-off), the last check, the
+answer (no hour of it reads while hours are expected: not connected, retried
+with the growing back-off), the settled hours that alone do not read (they
+keep the provisional price and are asked again a day later, the other hours
+go on hourly), the last check, the
 last error and the next attempt, the calendar not fed, the number of contracts
 on the template, a `/data` that cannot be written. `/data` unreadable: read
 again every 10 seconds, nothing asked meanwhile. The configuration not
@@ -145,6 +148,9 @@ time up to 5 minutes.
 
 - Never tested with a real key nor a real contract.
 - Corrections the AESO makes to a day already complete are not read again.
-- A calendar emptied on the Gladys side (a database restored) is read back at
-  each connection and the missing days are sent again.
+- At each connection the calendar is read back from the day of the last entry
+  Gladys holds: days lost at its end (a database restored) are sent again. The
+  oldest days Gladys purges every night (it keeps the calendar back to its
+  oldest stored state) are never sent again. An empty calendar is sent again
+  whole, once.
 - No device, no scene trigger: the price is used through the contract.

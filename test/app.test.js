@@ -657,3 +657,175 @@ test('after a restart, a new key clears the refusal kept in /data', async () => 
   assert.equal(store.data.refused, undefined);
   assert.equal(second.source.count(), 2);
 });
+
+/** Counts the calendar publications from now on. */
+function spyPublish(t, gladys) {
+  const calls = [];
+  const real = gladys.publishEnergyCalendar.bind(gladys);
+  t.mock.method(gladys, 'publishEnergyCalendar', async (key, list) => {
+    calls.push(list);
+    return real(key, list);
+  });
+  return calls;
+}
+
+test('reconnection: nothing lost, nothing sent again (today partial included)', async (t) => {
+  const { gladys, wait } = await setup();
+  const calls = spyPublish(t, gladys);
+  await gladys.disconnect();
+  await gladys.connect();
+  await wait(SECOND);
+  assert.equal(calls.length, 0);
+});
+
+test('the nightly purge of the core (the oldest days) is never sent again', async (t) => {
+  const { gladys, wait, entries } = await setup();
+  const cut = new Date(dayStart('2026-11-04')).toISOString();
+  const list = gladys.fake.energyCalendars[CALENDAR];
+  list.splice(
+    0,
+    list.findIndex((e) => e.starts_at >= cut),
+  );
+  const kept = entries().length;
+  const calls = spyPublish(t, gladys);
+  for (let i = 0; i < 3; i += 1) {
+    await gladys.disconnect();
+    await gladys.connect();
+    await wait(SECOND);
+  }
+  assert.equal(calls.length, 0);
+  assert.equal(entries().length, kept);
+});
+
+test('a restored database (the end of the calendar lost): those days sent again, only those', async (t) => {
+  const { gladys, wait, entries } = await setup();
+  const full = entries().length;
+  const cut = new Date(dayStart('2026-11-13')).toISOString();
+  const list = gladys.fake.energyCalendars[CALENDAR];
+  list.splice(list.findIndex((e) => e.starts_at >= cut));
+  const calls = spyPublish(t, gladys);
+  await gladys.disconnect();
+  await gladys.connect();
+  await wait(SECOND);
+  assert.equal(entries().length, full);
+  assert.equal(calls.flat().length, (24 + 11) * 2);
+});
+
+test('a second half-hour lost alone is sent again', async () => {
+  const { gladys, wait, entries } = await setup();
+  const full = entries().length;
+  const lost = new Date(dayStart('2026-11-14') + 3 * HOUR + 30 * MINUTE).toISOString();
+  const list = gladys.fake.energyCalendars[CALENDAR];
+  list.splice(
+    list.findIndex((e) => e.starts_at === lost),
+    1,
+  );
+  await gladys.disconnect();
+  await gladys.connect();
+  await wait(SECOND);
+  assert.equal(entries().length, full);
+});
+
+test('the read-back hanging or failing never blocks the connection nor the reads', async (t) => {
+  for (const mode of ['hang', '403', 'throw']) {
+    const { gladys, app, clock, source, wait, status, entries } = await setup();
+    t.mock.method(gladys, 'getEnergyCalendar', async () => {
+      if (mode === 'hang') return new Promise(() => {});
+      if (mode === '403') throw new GladysApiError(403, 'FORBIDDEN', 'not yours');
+      throw new Error('boom');
+    });
+    gladys.fake.energyCalendars[CALENDAR].splice(0);
+    let result = 'hung';
+    app.connected().then(() => {
+      result = 'done';
+    });
+    // 30 s of virtual time, in steps: the read-back gives up at 20 s.
+    for (let i = 0; i < 6 && result !== 'done'; i += 1) {
+      await clock.advance(5 * SECOND);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    assert.equal(result, 'done', mode);
+    await wait(45 * MINUTE);
+    assert.equal(source.count(), 3, `${mode}: the hourly read goes on`);
+    assert.equal(status().connected, true);
+    assert.ok(entries().length > 0, `${mode}: the new hour is published`);
+    await app.stop();
+  }
+});
+
+test('the read-back of an old connection changes nothing once stopped', async (t) => {
+  const { gladys, app, clock } = await setup();
+  let release;
+  const real = gladys.getEnergyCalendar.bind(gladys);
+  t.mock.method(gladys, 'getEnergyCalendar', (key, options) =>
+    options?.limit
+      ? real(key, options)
+      : new Promise((resolve) => {
+          release = resolve;
+        }),
+  );
+  const sent = { ...app.sent };
+  const pending = app.connected();
+  for (let i = 0; i < 20 && !release; i += 1) await clock.advance(0);
+  assert.ok(release, 'the second read is under way');
+  await app.stop();
+  release([]);
+  await pending;
+  assert.deepEqual(app.sent, sent);
+});
+
+test('a broken row for an hour already held: no failure, still connected', async () => {
+  const { source, wait, status, app } = await setup();
+  const held = dayStart('2026-11-14') + 2 * HOUR;
+  source.handler = (r) => {
+    const body = answer(r.first, r.last, r.at);
+    body.return['Pool Price Report'].push({ ...row(held, '12.00'), begin_datetime_mpt: 'garbage' });
+    return body;
+  };
+  await wait(45 * MINUTE + SECOND);
+  assert.equal(source.count(), 3);
+  assert.equal(app.meta.failures, 0);
+  assert.equal(status().connected, true);
+});
+
+test('one settled hour unreadable for good: the hourly rhythm goes on, said, asked again a day later', async () => {
+  const bad = dayStart('2026-11-14') + 11 * HOUR; // 11:00-12:00, settled at 12:01
+  const { source, wait, status, app } = await setup();
+  source.handler = (r) => {
+    const body = answer(r.first, r.last, r.at);
+    for (const x of body.return['Pool Price Report']) {
+      if (x.begin_datetime_utc === row(bad, '').begin_datetime_utc && x.pool_price) {
+        x.pool_price = 'N/A';
+      }
+    }
+    return body;
+  };
+  await wait(45 * MINUTE + SECOND); // 12:05: the hour reads as N/A only after 13:00
+  await wait(HOUR); // 13:05: 'N/A' an hour after its end: unreadable
+  const n = source.count();
+  assert.match(status().message.en, /1 settled hour\(s\) unreadable/);
+  assert.equal(status().connected, true);
+  await wait(5 * HOUR);
+  assert.ok(source.count() - n <= 6, `${source.count() - n} requests in 5 hours`);
+  assert.equal(app.meta.failures, 0);
+  // The next day, once its day of waiting is over: asked again.
+  const before = source.count();
+  await wait(19 * HOUR); // 13:05 the next day
+  const covering = () =>
+    source.requests.slice(before).filter((r) => r.first <= '2026-11-14' && r.last >= '2026-11-14')
+      .length;
+  const early = covering();
+  await wait(30 * MINUTE);
+  assert.ok(covering() > early, 'the unreadable hour asked again after a day');
+});
+
+test('an answer with nothing readable while every hour is held is no failure', async () => {
+  const { gladys, source, wait, app } = await setup();
+  await wait(MINUTE + SECOND); // 11:21: every hour up to 10:00 held
+  source.handler = (r) => ({
+    'Pool Price Report': [{ ...row(dayStart(r.first) + HOUR, '1.00'), begin_datetime_mpt: 'x' }],
+  });
+  const ack = await gladys.fake.action('test_key', {});
+  assert.match(ack.data.message.en, /Key accepted/);
+  assert.equal(app.meta.failures, 0);
+});

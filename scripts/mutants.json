@@ -300,18 +300,6 @@
     "to": "      if (false) {\n        this.refused = undefined;"
   },
   {
-    "name": "r1 I1: unreadable hours a quiet success",
-    "file": "src/app.js",
-    "from": "if (answer.refused > 0 && !run.every((day) => this.done(day, expected))) {",
-    "to": "if (false) {"
-  },
-  {
-    "name": "r1 m3: lost calendar never sent again",
-    "file": "src/app.js",
-    "from": "if (!whole) delete this.sent[day];",
-    "to": ""
-  },
-  {
     "name": "r1 m6: quota days ignored",
     "file": "src/http.js",
     "from": "Number(wait[1] ?? 0) * 24",
@@ -322,5 +310,83 @@
     "file": "src/app.js",
     "from": "if (this.config.problem) return T[this.config.problem];",
     "to": ""
+  },
+  {
+    "name": "r2 N1: any refused row fails even with every hour held",
+    "file": "src/app.js",
+    "from": "          answer.refused > 0 &&\n          !run.every((day) => this.done(day, expected, now))",
+    "to": "          answer.refused > 0"
+  },
+  {
+    "name": "r2 I1: no readable hour a quiet success",
+    "file": "src/app.js",
+    "from": "          answer.hours.size === 0 &&\n",
+    "to": "          false &&\n"
+  },
+  {
+    "name": "r2 N3: day with unknown hours always resent",
+    "file": "src/app.js",
+    "from": "            price === null ||",
+    "to": "            false ||"
+  },
+  {
+    "name": "r2 N4: second half-hour not checked",
+    "file": "src/app.js",
+    "from": "(held.has(record.start + k * HOUR) && held.has(record.start + k * HOUR + HALF_HOUR))",
+    "to": "held.has(record.start + k * HOUR)"
+  },
+  {
+    "name": "r2 N5: read-back without deadline",
+    "file": "src/app.js",
+    "from": "const entries = await Promise.race([job, late]);",
+    "to": "const entries = await job;"
+  },
+  {
+    "name": "r2 N6: read-back failure throws",
+    "file": "src/app.js",
+    "from": "      );\n      return undefined;\n    } finally {",
+    "to": "      );\n      throw err;\n    } finally {"
+  },
+  {
+    "name": "r2 N7: read-back ignores the generation",
+    "file": "src/app.js",
+    "from": "if (gen !== this.generation || entries === undefined) return;",
+    "to": "if (entries === undefined) return;"
+  },
+  {
+    "name": "r2 I3: purged days sent again",
+    "file": "src/app.js",
+    "from": "const days = sentDays.filter((day) => day >= dayOf(lastAt));",
+    "to": "const days = sentDays;"
+  },
+  {
+    "name": "r2 m3: lost calendar never sent again",
+    "file": "src/app.js",
+    "from": "if (!whole) delete this.sent[day];",
+    "to": ""
+  },
+  {
+    "name": "r2 m8: unreadable hour holds the rhythm",
+    "file": "src/app.js",
+    "from": "if (until !== undefined && until > now) continue;",
+    "to": ""
+  },
+  {
+    "name": "r2 m8: unreadable hour never asked again",
+    "file": "src/app.js",
+    "from": "if (until !== undefined && until > now) continue;",
+    "to": "if (until !== undefined) continue;"
+  },
+  {
+    "name": "r2 m8: placeholder of a just-ended hour refused",
+    "file": "src/data.js",
+    "from": "if (start + 2 * HOUR > now) continue;",
+    "to": ""
+  },
+  {
+    "name": "r2 m8: unreadable hours not said",
+    "file": "src/app.js",
+    "from": "until > now && !this.heldAt(t)",
+    "to": "false"
   }
 ]

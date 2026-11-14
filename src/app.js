@@ -126,6 +126,8 @@ export class App {
     this.attemptMono = undefined;
     /** `{ until (wall), due (mono), code }` after a 429 or a quota. */
     this.pause = undefined;
+    /** Hour start -> wall time until which an hour the AESO answered unreadable waits. */
+    this.unreadable = new Map();
     /** `{ salt, tag }` of the refused key (/data), and the key itself (memory only). */
     this.refused = undefined;
     this.refusedKey = undefined;
@@ -425,13 +427,23 @@ export class App {
   // --- What to ask, and when --------------------------------------------------------
 
   /** Every hour of `day` up to `expected` is held. */
-  done(day, expected) {
+  /**
+   * Every hour of `day` up to `expected` is held, or was unreadable at the
+   * AESO less than a day before `now` (asked again a day later, so one bad
+   * hour never holds back the hourly rhythm).
+   */
+  done(day, expected, now = expected) {
     const record = this.days.get(day);
     const start = dayStart(day);
     const count = hoursOf(day);
     for (let k = 0; k < count; k += 1) {
-      if (start + k * HOUR > expected) break;
-      if (!record || record.prices[k] === null) return false;
+      const t = start + k * HOUR;
+      if (t > expected) break;
+      if (!record || record.prices[k] === null) {
+        const until = this.unreadable.get(t);
+        if (until !== undefined && until > now) continue;
+        return false;
+      }
     }
     return true;
   }
@@ -455,8 +467,10 @@ export class App {
     const last = dayOf(expected);
     const days = [];
     let wake = nextPublication(now);
+    // An unreadable hour is asked again when its day of waiting ends.
+    for (const until of this.unreadable.values()) if (until > now) wake = Math.min(wake, until);
     for (const day of daysBetween(this.firstDay(today), last).reverse()) {
-      if (this.done(day, expected)) continue;
+      if (this.done(day, expected, now)) continue;
       const at = this.incomplete.get(day);
       if (at !== undefined) {
         const again = at + (day >= addDays(today, -1) ? WAIT_PUBLICATION : EMPTY_RETRY);
@@ -592,14 +606,29 @@ export class App {
             summary.price = price;
           }
         }
-        // Hours that do not read and an expected hour still lacking: an
-        // unreadable answer (a changed format or clock), never a quiet success.
-        const expected = lastExpected(this.now());
-        if (answer.refused > 0 && !run.every((day) => this.done(day, expected))) {
+        // No hour of the answer reads while hours are expected: a broken
+        // answer (a changed format or clock), never a quiet success.
+        const now = this.now();
+        const expected = lastExpected(now);
+        if (
+          answer.hours.size === 0 &&
+          answer.refused > 0 &&
+          !run.every((day) => this.done(day, expected, now))
+        ) {
           throw new SourceError(
             'invalid',
-            `The AESO Pool Price Report: ${answer.refused} hour(s) unreadable, an expected hour lacking`,
+            `The AESO Pool Price Report: ${answer.refused} hour(s) unreadable, none readable`,
           );
+        }
+        // Some hours do not read: those wait a day, the others go on (said in the status).
+        for (const start of answer.bad) {
+          const day = dayOf(start);
+          const record = this.days.get(day);
+          const k = record ? (start - record.start) / HOUR : -1;
+          if ((!record || record.prices[k] === null) && !(this.unreadable.get(start) > now)) {
+            // Dated from the first time it did not read: seen again meanwhile, the day stays.
+            this.unreadable.set(start, now + EMPTY_RETRY);
+          }
         }
       } catch (err) {
         if (gen !== this.generation) return { ok: false, error: 'restarted' };
@@ -687,7 +716,7 @@ export class App {
         this.days.set(day, record);
         changed = true;
       }
-      if (this.done(day, expected)) this.incomplete.delete(day);
+      if (this.done(day, expected, now)) this.incomplete.delete(day);
       else this.incomplete.set(day, now);
     }
     return changed;
@@ -699,6 +728,13 @@ export class App {
     for (const day of this.days.keys()) if (day < oldest) this.days.delete(day);
     for (const day of this.incomplete.keys()) if (day < oldest) this.incomplete.delete(day);
     for (const day of Object.keys(this.sent)) if (day < oldest) delete this.sent[day];
+    for (const [t, until] of this.unreadable) if (until <= now) this.unreadable.delete(t);
+  }
+
+  /** The price of the hour starting at `t` is held. */
+  heldAt(t) {
+    const record = this.days.get(dayOf(t));
+    return Boolean(record) && typeof record.prices[(t - record.start) / HOUR] === 'number';
   }
 
   // --- Calendar -------------------------------------------------------------------
@@ -773,42 +809,64 @@ export class App {
     this.publishStatus();
   }
 
+  /** One read of the calendar from Gladys, bounded in time: the entries, or undefined. */
+  async readCalendar(options) {
+    let timer;
+    const late = new Promise((resolve) => {
+      timer = this.timers.setTimeout(() => resolve('timeout'), CALENDAR_TIMEOUT);
+    });
+    try {
+      const job = Promise.resolve().then(() => this.gladys.getEnergyCalendar(CALENDAR, options));
+      const entries = await Promise.race([job, late]);
+      if (entries === 'timeout') {
+        job.catch(() => {});
+        this.logger.warn(`Calendar ${CALENDAR}: not read back in time`);
+        return undefined;
+      }
+      return Array.isArray(entries) ? entries : undefined;
+    } catch (err) {
+      this.logger.warn(
+        `Calendar ${CALENDAR} not read back: ${err?.status ?? err?.name ?? 'error'}`,
+      );
+      return undefined;
+    } finally {
+      this.timers.clearTimeout(timer);
+    }
+  }
+
   /**
-   * Reads the calendar back from Gladys (20 days a call, bounded in time):
-   * a day marked sent whose entries are not all there is sent again. A read
-   * that fails changes nothing (secondary).
+   * At a connection, what Gladys lost of the calendar is sent again. A
+   * database restored loses the END of the calendar; the nightly retention of
+   * the core purges its BEGINNING, which must never be sent again (it would be
+   * purged the next night, and every resend queues a recalculation). So only
+   * the days from the day of the last entry Gladys holds are read back (one
+   * call for that entry, then 20 days a call), and a day whose slots are not
+   * all there is sent again; an empty calendar is sent again whole, once. A
+   * read that fails or hangs changes nothing (secondary, 20 s at most).
    */
   async checkCalendar(gen) {
-    const days = Object.keys(this.sent)
+    const sentDays = Object.keys(this.sent)
       .filter((day) => this.days.has(day))
       .sort();
+    if (sentDays.length === 0) return;
+    const last = await this.readCalendar({ limit: 1 });
+    if (gen !== this.generation || last === undefined) return;
+    const lastAt = Date.parse(last[0]?.starts_at);
+    if (!Number.isFinite(lastAt)) {
+      // Nothing left at all: not a purge (it keeps the recent days), a loss.
+      for (const day of sentDays) delete this.sent[day];
+      return;
+    }
+    const days = sentDays.filter((day) => day >= dayOf(lastAt));
     for (let i = 0; i < days.length; i += CALENDAR_READ_DAYS) {
       const slice = days.slice(i, i + CALENDAR_READ_DAYS);
       const from = dayStart(slice[0]);
       const to = dayStart(addDays(slice[slice.length - 1], 1));
-      let timer;
-      const late = new Promise((resolve) => {
-        timer = this.timers.setTimeout(() => resolve('timeout'), CALENDAR_TIMEOUT);
+      const entries = await this.readCalendar({
+        from: new Date(from).toISOString(),
+        to: new Date(to - 1).toISOString(),
       });
-      let entries;
-      try {
-        const job = Promise.resolve().then(() =>
-          this.gladys.getEnergyCalendar(CALENDAR, {
-            from: new Date(from).toISOString(),
-            to: new Date(to - 1).toISOString(),
-          }),
-        );
-        entries = await Promise.race([job, late]);
-        if (entries === 'timeout') job.catch(() => {});
-      } catch (err) {
-        this.logger.warn(
-          `Calendar ${CALENDAR} not read back: ${err?.status ?? err?.name ?? 'error'}`,
-        );
-        return;
-      } finally {
-        this.timers.clearTimeout(timer);
-      }
-      if (gen !== this.generation || !Array.isArray(entries)) return;
+      if (gen !== this.generation || entries === undefined) return;
       const held = new Set();
       for (const entry of entries) {
         const t = Date.parse(entry?.starts_at);
@@ -906,6 +964,7 @@ export class App {
     if (this.config === undefined) return { connected: false, message: T.starting };
     if (this.config.problem) return { connected: false, message: T[this.config.problem] };
     if (this.keyRefused()) return { connected: false, message: T.refused };
+    const now = this.now();
     let through;
     for (const record of this.days.values()) {
       record.prices.forEach((price, k) => {
@@ -923,6 +982,8 @@ export class App {
         calendar: this.calendarIssue,
         contracts: this.contracts,
         dataError: this.dataError,
+        unreadable: [...this.unreadable].filter(([t, until]) => until > now && !this.heldAt(t))
+          .length,
       }),
     };
   }

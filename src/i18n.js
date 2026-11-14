@@ -75,7 +75,7 @@ export const T = {
    * The status: the last settled hour held, the last check and its error,
    * the calendar not fed, the contracts, a /data that cannot be written.
    */
-  status({ through, checkedAt, error, retryAt, calendar, contracts, dataError }) {
+  status({ through, checkedAt, error, retryAt, calendar, contracts, dataError, unreadable = 0 }) {
     return both((lang) => {
       const en = lang === 'en';
       const parts = [];
@@ -101,6 +101,13 @@ export const T = {
           en
             ? `Last attempt failed: ${reason(error, lang)}${next ? `, next one about ${next}` : ''}.`
             : `Dernière tentative en échec : ${reason(error, lang)}${next ? `, prochaine vers ${next}` : ''}.`,
+        );
+      }
+      if (unreadable > 0) {
+        parts.push(
+          en
+            ? `${unreadable} settled hour(s) unreadable in the AESO answers: they keep the provisional price, asked again a day later.`
+            : `${unreadable} heure(s) réglée(s) illisible(s) dans les réponses de l’AESO : elles gardent le prix provisoire, redemandées un jour plus tard.`,
         );
       }
       if (calendar === 'refused') {

@@ -26,6 +26,9 @@ the notes of the version's GitHub Release.
   refused key; 429 and quota pauses kept in /data.
 - An answer whose hours do not read while an expected hour lacks is an error
   (not connected, growing back-off), never a quiet success.
-- The calendar is read back from Gladys at each connection: days lost there
-  (a database restored) are sent again.
+- The calendar is read back from Gladys at each connection, from its last
+  entry: days lost at its end (a database restored) are sent again, the days
+  the core purges never.
+- One unreadable settled hour waits a day (said in the status) without slowing
+  the other hours.
 - `countries: ["CA"]` in the manifest (Gladys 5.3.0 or later).

@@ -15,7 +15,10 @@
 // hour has ended, and the pool price is a plain decimal within -1,000 ..
 // 3,000 CAD/MWh. An empty pool price (the current hour, the next ones, which
 // only carry a forecast) is unknown, never zero. The forecast is never read.
-// A duplicate hour with another price leaves that hour unknown. Linear,
+// A non-numeric price for an hour ended less than an hour ago (a "-" placeholder)
+// is "not settled yet", like an empty one. The UTC starts of the rows refused
+// are returned (`bad`), so one unreadable hour can be told apart from a broken
+// answer. A duplicate hour with another price leaves that hour unknown. Linear,
 // bounded in rows, no prototype involved.
 // -----------------------------------------------------------------------------
 
@@ -85,6 +88,7 @@ export function parseAnswer(json, now) {
   const rows = rowsOf(json);
   const hours = new Map();
   const conflicts = new Set();
+  const bad = new Set();
   let refused = 0;
   for (const row of rows) {
     if (!isObject(row)) {
@@ -94,6 +98,7 @@ export function parseAnswer(json, now) {
     const start = utcHour(row.begin_datetime_utc);
     if (start === undefined || row.begin_datetime_mpt !== localText(start)) {
       refused += 1;
+      if (start !== undefined) bad.add(start);
       continue;
     }
     // Not settled yet: the current hour and the next ones carry a forecast only.
@@ -102,7 +107,10 @@ export function parseAnswer(json, now) {
     if (raw === '' || raw === null || raw === undefined) continue;
     const price = priceOf(raw);
     if (price === undefined) {
+      // Just ended: a placeholder until the AESO settles it.
+      if (start + 2 * HOUR > now) continue;
       refused += 1;
+      bad.add(start);
       continue;
     }
     if (hours.has(start) && hours.get(start) !== price) conflicts.add(start);
@@ -111,8 +119,9 @@ export function parseAnswer(json, now) {
   for (const start of conflicts) {
     hours.delete(start);
     refused += 1;
+    bad.add(start);
   }
-  return { hours, refused };
+  return { hours, refused, bad };
 }
 
 /** The record of a local day from the hours of an answer: `{ start, prices, known }`. */

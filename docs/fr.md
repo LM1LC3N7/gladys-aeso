@@ -106,7 +106,8 @@ Les réponses sont lues strictement : une heure n’est gardée que si ses débu
 UTC et heure des Rocheuses concordent, que l’heure est finie et que le prix est
 un nombre simple entre −1 000 et 3 000 CAD/MWh (les règles du marché le bornent
 aujourd’hui à 0 .. 999,99). Un prix vide (l’heure en cours et les suivantes, qui
-n’ont qu’une prévision) est inconnu. Une réponse n’efface jamais un prix gardé ;
+n’ont qu’une prévision) est inconnu ; de même un prix non numérique (comme « - »)
+pendant l’heure qui suit la fin de son heure. Une réponse n’efface jamais un prix gardé ;
 un prix corrigé le remplace.
 
 ## Erreurs et pauses
@@ -141,8 +142,10 @@ novembre 2026 garde ses jours de 23 et 25 heures.
 ## Statut
 
 Le statut de l’intégration montre la dernière heure réglée gardée, une réponse
-illisible (des heures dont l’horaire ou le prix ne se lit pas alors qu’une heure
-attendue manque : non connecté, nouvel essai avec le délai croissant), la dernière
+illisible (aucune de ses heures ne se lit alors que des heures sont attendues :
+non connecté, nouvel essai avec le délai croissant), les heures réglées qui
+seules ne se lisent pas (elles gardent le prix provisoire et sont redemandées un
+jour plus tard, les autres heures continuent à l’heure), la dernière
 vérification, la dernière erreur et la prochaine tentative, le calendrier non
 alimenté, le nombre de contrats sur le modèle, un `/data` impossible à écrire.
 `/data` illisible : relu toutes les 10 secondes, rien n’est demandé en
@@ -153,7 +156,10 @@ attendant. La configuration illisible dans Gladys : redemandée après
 
 - Jamais testée avec une vraie clé ni un vrai contrat.
 - Les corrections de l’AESO sur un jour déjà complet ne sont pas relues.
-- Un calendrier vidé côté Gladys (une base restaurée) est relu à chaque
-  connexion et les jours manquants sont renvoyés.
+- À chaque connexion, le calendrier est relu depuis le jour de la dernière
+  entrée que Gladys garde : les jours perdus à sa fin (une base restaurée) sont
+  renvoyés. Les plus vieux jours que Gladys purge chaque nuit (il garde le
+  calendrier jusqu’à son plus vieil état enregistré) ne sont jamais renvoyés.
+  Un calendrier vide est renvoyé en entier, une fois.
 - Aucun appareil, aucun déclencheur de scène : le prix sert à travers le
   contrat.

@@ -56,10 +56,16 @@
   is asked without it.
 - The tz database must know the 2026 change (`TZ_CURRENT`): otherwise nothing
   is asked (every winter hour would be an hour off).
-- Unreadable rows plus an expected hour lacking = an `invalid` failure (status
-  not connected, back-off): a changed format or clock is visible (review r1).
-- The calendar is read back at each connection (20 days a call) and a day
-  whose slots are not all there is sent again (review r1).
+- An answer where no hour reads while hours are expected = an `invalid`
+  failure (status not connected, back-off): a changed format or clock is
+  visible (review r1). A single unreadable settled hour only waits a day
+  (status warning), the hourly rhythm goes on; a non-numeric price within the
+  hour after its end is "not settled yet" (review r2).
+- The calendar is read back at each connection from the day of the last entry
+  Gladys holds (`limit: 1`, then 20 days a call): the end lost by a restore is
+  sent again, the beginning purged by the core every night never (review r2).
+- The placeholder of a just-ended hour ("" or "-") is a guess from gridstatus
+  and the ETS report: check it on the first real answers.
 - No device and no scene trigger in 0.1.0 (the price goes through the
   contract); `type: provider`.
 - `.github/workflows/ci.yml`: `timeout-minutes: 30` on both jobs (taken from
