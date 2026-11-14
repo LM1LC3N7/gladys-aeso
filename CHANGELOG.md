@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-14
+
 ### Added
 
 - The hourly AESO pool price, read from the official API with the user's free
@@ -34,3 +36,6 @@ the notes of the version's GitHub Release.
 - One unreadable settled hour waits a day (said in the status) without slowing
   the other hours.
 - `countries: ["CA"]` in the manifest (Gladys 5.3.0 or later).
+
+[Unreleased]: https://github.com/LM1LC3N7/gladys-aeso/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/LM1LC3N7/gladys-aeso/releases/tag/v0.1.1

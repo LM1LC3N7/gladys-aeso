@@ -1,6 +1,6 @@
 {
   "name": "gladys-aeso",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Alberta pool price for Gladys Assistant: the hourly AESO pool price as an energy calendar and a floating-rate contract template (unofficial).",
   "type": "module",
