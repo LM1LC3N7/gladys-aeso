@@ -27,6 +27,7 @@ import {
   BACKFILL_DAYS,
   CALENDAR,
   CALENDAR_BATCH,
+  CALENDAR_READ_DAYS,
   CALENDAR_TIMEOUT,
   CONFIG_RETRY,
   CONFIG_RETRY_MAX,
@@ -102,7 +103,7 @@ export class App {
     random = randomBytes,
     tzCurrent = TZ_CURRENT,
   }) {
-    /** The tz database knows Alberta's permanent UTC-6 (2026e or later). */
+    /** The tz database knows Alberta's permanent UTC-6 (2026c or later). */
     this.tzCurrent = tzCurrent;
     this.gladys = gladys;
     this.logger = logger;
@@ -203,6 +204,9 @@ export class App {
     if (this.checking) this.checking.then(resume, resume);
     else resume();
     await this.refreshContracts(gen);
+    // What the calendar lost (a Gladys database restored) is sent again.
+    await this.checkCalendar(gen);
+    if (gen !== this.generation) return;
     // What the calendar missed while disconnected: no request to the API for that.
     await this.publishCalendar(gen);
   }
@@ -588,6 +592,15 @@ export class App {
             summary.price = price;
           }
         }
+        // Hours that do not read and an expected hour still lacking: an
+        // unreadable answer (a changed format or clock), never a quiet success.
+        const expected = lastExpected(this.now());
+        if (answer.refused > 0 && !run.every((day) => this.done(day, expected))) {
+          throw new SourceError(
+            'invalid',
+            `The AESO Pool Price Report: ${answer.refused} hour(s) unreadable, an expected hour lacking`,
+          );
+        }
       } catch (err) {
         if (gen !== this.generation) return { ok: false, error: 'restarted' };
         if (!(err instanceof SourceError)) throw err;
@@ -758,6 +771,59 @@ export class App {
     if (gen !== this.generation) return;
     if (any) await this.save();
     this.publishStatus();
+  }
+
+  /**
+   * Reads the calendar back from Gladys (20 days a call, bounded in time):
+   * a day marked sent whose entries are not all there is sent again. A read
+   * that fails changes nothing (secondary).
+   */
+  async checkCalendar(gen) {
+    const days = Object.keys(this.sent)
+      .filter((day) => this.days.has(day))
+      .sort();
+    for (let i = 0; i < days.length; i += CALENDAR_READ_DAYS) {
+      const slice = days.slice(i, i + CALENDAR_READ_DAYS);
+      const from = dayStart(slice[0]);
+      const to = dayStart(addDays(slice[slice.length - 1], 1));
+      let timer;
+      const late = new Promise((resolve) => {
+        timer = this.timers.setTimeout(() => resolve('timeout'), CALENDAR_TIMEOUT);
+      });
+      let entries;
+      try {
+        const job = Promise.resolve().then(() =>
+          this.gladys.getEnergyCalendar(CALENDAR, {
+            from: new Date(from).toISOString(),
+            to: new Date(to - 1).toISOString(),
+          }),
+        );
+        entries = await Promise.race([job, late]);
+        if (entries === 'timeout') job.catch(() => {});
+      } catch (err) {
+        this.logger.warn(
+          `Calendar ${CALENDAR} not read back: ${err?.status ?? err?.name ?? 'error'}`,
+        );
+        return;
+      } finally {
+        this.timers.clearTimeout(timer);
+      }
+      if (gen !== this.generation || !Array.isArray(entries)) return;
+      const held = new Set();
+      for (const entry of entries) {
+        const t = Date.parse(entry?.starts_at);
+        if (Number.isFinite(t)) held.add(t);
+      }
+      for (const day of slice) {
+        const record = this.days.get(day);
+        const whole = record.prices.every(
+          (price, k) =>
+            price === null ||
+            (held.has(record.start + k * HOUR) && held.has(record.start + k * HOUR + HALF_HOUR)),
+        );
+        if (!whole) delete this.sent[day];
+      }
+    }
   }
 
   /** One calendar batch, bounded in time: `{ sent }` or `{ sent: false, issue }`. Never throws. */

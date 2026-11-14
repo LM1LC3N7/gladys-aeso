@@ -13,9 +13,9 @@ rate that tracks the pool price.
 
 ## Get a key (free)
 
-1. Sign up on the AESO developer portal, <https://developer-apim.aeso.ca/>
-   (signing up means accepting the AESO terms of use: personal use).
-2. Subscribe to the **public** product and copy its **primary key**.
+1. Sign up on the AESO developer portal, <https://developer-apim.aeso.ca/>.
+2. Subscribe to the **public** product (subscribing means accepting the terms
+   of use of the product) and copy its **primary key**.
 3. In Gladys, paste it in the **AESO API key** field of the integration and
    save. Press **Test the key**: it reads today's settled hours once and tells
    you the last one.
@@ -57,9 +57,29 @@ prices: it is known only once the hour has ended. So:
 - while the integration is stopped, the provisional price stays counted; when
   it comes back, it reads the missing hours and Gladys recomputes them.
 
-A missing hour is never guessed by the integration nor written as 0: it stays
-unknown in the calendar, and Gladys counts the provisional price you chose.
+A missing hour is never guessed by the integration nor written to the
+calendar: it stays unknown there, and Gladys counts the provisional price you
+chose (the price you type, even 0 if you type 0: Gladys does not refuse it).
 The AESO forecast pool price is never used.
+
+## What the template does not express
+
+- Each hour of your meter is priced at the pool price of that hour. A retailer
+  that bills a monthly average (weighted by the provincial load profile, for
+  example) gives another amount: the template then only approximates your
+  bill.
+- The integration keeps 400 days of prices: an interval older than that, in a
+  contract starting earlier, keeps the provisional price.
+
+## AESO terms of use
+
+The pool prices are the AESO's data. The AESO allows a non-commercial,
+personal or educational use (<https://www.aeso.ca/legal>); the terms of use of
+the API product are accepted when you subscribe to it, and the AESO may refuse
+or revoke a key. Use your key for your own home only: do not share it, and do
+not share nor resell the prices. The conversion from /MWh to /kWh and the
+30-minute slots are made in your own Gladys; nothing of the AESO data ships
+with the integration. Each status says "Source: AESO".
 
 ## Source and requests
 
@@ -104,15 +124,17 @@ status, the prices are still read.
 
 ## Time zone
 
-Alberta keeps UTC-6 all year since 1 November 2026. The settlement days follow
-the time zone database of the integration's Node.js (2026e or later knows the
-change); with an older one, every winter hour would be an hour off the AESO's
+Alberta keeps UTC-6 all year: by law since 18 June 2026, and the clocks did not
+go back on 1 November 2026. The settlement days follow the time zone database
+of the integration's Node.js (2026c or later knows the change); with an older one, every winter hour would be an hour off the AESO's
 own Mountain times, so the integration asks nothing and says so. The history
 before November 2026 keeps its 23- and 25-hour days.
 
 ## Status
 
-The integration status shows the last settled hour held, the last check, the
+The integration status shows the last settled hour held, an unreadable
+answer (hours whose times or prices do not read while an expected hour lacks:
+not connected, retried with the growing back-off), the last check, the
 last error and the next attempt, the calendar not fed, the number of contracts
 on the template, a `/data` that cannot be written. `/data` unreadable: read
 again every 10 seconds, nothing asked meanwhile. The configuration not
@@ -123,4 +145,6 @@ time up to 5 minutes.
 
 - Never tested with a real key nor a real contract.
 - Corrections the AESO makes to a day already complete are not read again.
+- A calendar emptied on the Gladys side (a database restored) is read back at
+  each connection and the missing days are sent again.
 - No device, no scene trigger: the price is used through the contract.

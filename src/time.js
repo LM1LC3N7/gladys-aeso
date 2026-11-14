@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 // Mountain Prevailing Time (America/Edmonton): the AESO settlement days run
 // from local midnight to local midnight. Alberta keeps UTC-6 all year since
-// 1 November 2026 (tz database 2026e); before, a day had 23 settlement hours
+// 1 November 2026 (by law since 18 June 2026, tz database 2026c); before, a day had 23 settlement hours
 // on the spring change and 25 on the autumn one, which the history still
 // has. Edmonton is a whole number of hours behind UTC (7 or 6), so a local
 // hour is a UTC hour. The days follow the tz database of the Node.js of the
@@ -64,7 +64,7 @@ export function dayStart(day) {
 
 /**
  * Whether the tz database knows that Alberta keeps UTC-6 all year from
- * November 2026 (2026e or later). An older one puts every winter hour an hour
+ * November 2026 (2026c or later). An older one puts every winter hour an hour
  * off the AESO's own MPT times: the module then asks nothing.
  */
 export const TZ_CURRENT = (() => {

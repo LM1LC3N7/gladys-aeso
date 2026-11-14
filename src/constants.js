@@ -70,6 +70,8 @@ export const MIN_KEY_LENGTH = 8;
 export const MAX_STATE_BYTES = 4 * 1024 * 1024;
 /** Entries in one calendar publication (the core takes 2,000 at most). */
 export const CALENDAR_BATCH = 2000;
+/** Days of the calendar read back from Gladys in one call (960 entries). */
+export const CALENDAR_READ_DAYS = 20;
 /** Contracts read for the status and the backfill. */
 export const MAX_CONTRACTS = 100;
 

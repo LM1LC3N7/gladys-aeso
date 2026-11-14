@@ -565,3 +565,95 @@ test('a past day the AESO answers incomplete: asked again once a day, not every 
   await wait(18 * HOUR + MINUTE);
   assert.equal(old(), 2);
 });
+
+test('hours that do not read (a shifted MPT time): an unreadable answer, not connected, backing off', async () => {
+  const { source, wait, status, entries } = await setup({
+    handler: (r) => {
+      const body = answer(r.first, r.last, r.at);
+      for (const x of body.return['Pool Price Report']) {
+        x.begin_datetime_mpt = x.begin_datetime_mpt.replace(
+          / (\d\d):/,
+          (m, h) => ` ${String((Number(h) + 1) % 24).padStart(2, '0')}:`,
+        );
+      }
+      return body;
+    },
+  });
+  assert.equal(entries().length, 0);
+  assert.equal(status().connected, false);
+  assert.match(status().message.en, /unreadable answer/);
+  assert.match(status().message.en, /provisional price/);
+  await wait(3 * HOUR);
+  assert.ok(source.count() <= 6, `${source.count()} requests in 3 hours`);
+});
+
+test('a future attempt time in /data is not believed: the start asks at once', async () => {
+  const { source } = await setup({ store: createMemoryStore({ attemptAt: NOW + 2 * HOUR }) });
+  assert.equal(source.count(), 2);
+});
+
+test('a contract older than 400 days: the reads stop at 400 days, no endless rereading', async () => {
+  const { source, wait, app } = await setup({
+    contracts: [{ ...CONTRACT, valid_from: '2024-01-01' }],
+  });
+  await wait(10 * MINUTE);
+  const n = source.count();
+  assert.ok(n >= 14 && n <= 16, `${n} requests`);
+  await wait(30 * MINUTE); // 12:00: before the hourly request
+  assert.equal(source.count(), n, 'nothing read again');
+  assert.equal([...app.days.keys()].sort()[0], '2025-10-11');
+});
+
+test('a contract months back: every day reaches the calendar, in batches of 2,000 at most', async (t) => {
+  const { gladys, wait, entries } = await setup({
+    start: false,
+    contracts: [{ ...CONTRACT, valid_from: '2026-06-01' }],
+  });
+  const sizes = [];
+  const real = gladys.publishEnergyCalendar.bind(gladys);
+  t.mock.method(gladys, 'publishEnergyCalendar', async (key, list) => {
+    sizes.push(list.length);
+    return real(key, list);
+  });
+  await gladys.connect();
+  await wait(3 * MINUTE);
+  // 2026-06-01 .. 2026-11-13 (166 days) and 11 hours of today, two slots an hour.
+  assert.equal(entries().length, (166 * 24 + 11) * 2);
+  assert.ok(
+    sizes.every((n) => n <= 2000),
+    sizes.join(','),
+  );
+});
+
+test('a calendar lost by Gladys (a database restored) is sent again at the next connection', async () => {
+  const { gladys, wait, entries, source } = await setup();
+  const full = entries().length;
+  gladys.fake.energyCalendars[CALENDAR].splice(0);
+  await gladys.disconnect();
+  await gladys.connect();
+  await wait(SECOND);
+  assert.equal(entries().length, full);
+  assert.equal(source.count(), 2, 'no request to the AESO for that');
+});
+
+test('a pause shorter than a minute is taken as a minute', async () => {
+  const { store } = await setup({
+    handler: () => new Response('', { status: 429, headers: { 'retry-after': '1' } }),
+  });
+  assert.ok(store.data.pause.until >= NOW + 60 * SECOND);
+});
+
+test('after a restart, a new key clears the refusal kept in /data', async () => {
+  const store = createMemoryStore();
+  const first = await setup({ store, handler: () => json({}, 401) });
+  assert.ok(store.data.refused);
+  await first.app.stop();
+  const second = await setup({ store });
+  assert.equal(second.source.count(), 0);
+  await second.gladys.fake.configUpdated({ api_key: 'another-key-0123456789' });
+  assert.equal(second.source.count(), 0, 'not yet: a minute after the last request');
+  assert.equal(store.data.refused, undefined, 'cleared at once, not by a later success');
+  await second.wait(MINUTE + SECOND);
+  assert.equal(store.data.refused, undefined);
+  assert.equal(second.source.count(), 2);
+});

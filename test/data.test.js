@@ -25,7 +25,7 @@ const NOW = Date.parse('2026-11-14T17:20:00Z');
 test('Mountain time: midnight, the last clock changes (23 and 25 hours), permanent UTC-6 since 2026-11-01', () => {
   assert.equal(dayStart('2026-01-15'), Date.parse('2026-01-15T07:00:00Z'), 'MST, UTC-7');
   assert.equal(dayStart('2026-07-01'), Date.parse('2026-07-01T06:00:00Z'), 'MDT, UTC-6');
-  // Alberta keeps UTC-6 all year from 1 November 2026 (tz database 2026e).
+  // Alberta keeps UTC-6 all year from 1 November 2026 (tz database 2026c).
   assert.equal(dayStart('2026-11-14'), Date.parse('2026-11-14T06:00:00Z'), 'UTC-6 in winter now');
   assert.equal(dayStart('2027-01-15'), Date.parse('2027-01-15T06:00:00Z'));
   // The last changes: second Sunday of March 2026, first Sunday of November 2025.

@@ -156,3 +156,45 @@ test('the file store: missing, written atomically, read back, unreadable told ap
   await assert.rejects(bad.save({ a: 1 }));
   await bad.save({ a: 1 }).catch(() => {});
 });
+
+test('getJson on a real server: a mute one and a dripping one are cut by the deadline', async (t) => {
+  const { createServer } = await import('node:http');
+  const timers = new Set();
+  const server = createServer((req, res) => {
+    if (req.url === '/mute') return; // never answers
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.write('[');
+    const tick = setInterval(() => res.write(' '), 50);
+    timers.add(tick);
+    res.on('close', () => clearInterval(tick));
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(async () => {
+    for (const tick of timers) clearInterval(tick);
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+  });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  for (const path of ['/mute', '/drip']) {
+    const started = performance.now();
+    await assert.rejects(
+      getJson(`${base}${path}`, { limit: 1_000_000, timeout: 400, key: 'k-123456789' }),
+      (e) => e.code === 'timeout',
+      path,
+    );
+    assert.ok(performance.now() - started < 5000, `${path} cut in time`);
+  }
+});
+
+test('a quota of more than a day (TimeSpan d.hh:mm:ss) is read whole', async () => {
+  await assert.rejects(
+    getJson('https://x/y', {
+      limit: 100,
+      fetchImpl: async () =>
+        new Response('Out of call volume quota. Quota will be replenished in 1.02:00:00.', {
+          status: 403,
+        }),
+    }),
+    (e) => e.code === 'rate_limited' && e.retryAfter === 26 * 3600 * 1000,
+  );
+});

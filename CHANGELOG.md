@@ -24,4 +24,8 @@ the notes of the version's GitHub Release.
 - A refused key (401) stops every automatic request, across restarts, until the
   key changes or the "Test the key" button succeeds; a 403 is never taken for a
   refused key; 429 and quota pauses kept in /data.
+- An answer whose hours do not read while an expected hour lacks is an error
+  (not connected, growing back-off), never a quiet success.
+- The calendar is read back from Gladys at each connection: days lost there
+  (a database restored) are sent again.
 - `countries: ["CA"]` in the manifest (Gladys 5.3.0 or later).

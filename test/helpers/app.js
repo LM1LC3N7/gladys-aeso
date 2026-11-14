@@ -16,7 +16,7 @@ export const SECOND = 1000;
 export const MINUTE = 60 * SECOND;
 export const HOUR = 60 * MINUTE;
 export const DAY = 24 * HOUR;
-/** Saturday 14 November 2026, 10:20 MST (UTC-7): the hour 09:00-10:00 is settled. */
+/** Saturday 14 November 2026, 11:20 local (UTC-6 all year now): the hour 10:00-11:00 is settled. */
 export const NOW = Date.parse('2026-11-14T17:20:00Z');
 export const KEY = 'a1b2c3d4e5f60718293a4b5c6d7e8f90';
 

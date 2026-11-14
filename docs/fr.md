@@ -14,9 +14,9 @@ qui suit le prix du pool.
 ## Obtenir une clé (gratuite)
 
 1. Inscrivez-vous sur le portail développeurs de l’AESO,
-   <https://developer-apim.aeso.ca/> (l’inscription vaut acceptation des
-   conditions d’utilisation de l’AESO : usage personnel).
-2. Abonnez-vous au produit **public** et copiez sa **clé primaire**.
+   <https://developer-apim.aeso.ca/>.
+2. Abonnez-vous au produit **public** (l’abonnement vaut acceptation des
+   conditions d’utilisation du produit) et copiez sa **clé primaire**.
 3. Dans Gladys, collez-la dans le champ **Clé d’API de l’AESO** de
    l’intégration et enregistrez. Appuyez sur **Tester la clé** : elle lit une
    fois les heures réglées d’aujourd’hui et indique la dernière.
@@ -58,9 +58,30 @@ Le prix du pool d’une heure est la moyenne de ses 60 prix marginaux du systèm
 - pendant un arrêt de l’intégration, le prix provisoire reste compté ; à son
   retour, elle lit les heures manquantes et Gladys les recalcule.
 
-Une heure manquante n’est jamais devinée par l’intégration ni écrite à 0 : elle
-reste inconnue dans le calendrier, et Gladys compte le prix provisoire que vous
-avez choisi. Le prix du pool prévu par l’AESO n’est jamais utilisé.
+Une heure manquante n’est jamais devinée par l’intégration ni écrite dans le
+calendrier : elle y reste inconnue, et Gladys compte le prix provisoire que vous
+avez choisi (le prix saisi, même 0 si vous saisissez 0 : Gladys ne le refuse
+pas). Le prix du pool prévu par l’AESO n’est jamais utilisé.
+
+## Ce que le modèle n’exprime pas
+
+- Chaque heure de votre compteur est tarifée au prix du pool de cette heure. Un
+  fournisseur qui facture une moyenne mensuelle (pondérée par le profil de
+  charge de la province, par exemple) donne un autre montant : le modèle n’est
+  alors qu’une approximation de votre facture.
+- L’intégration garde 400 jours de prix : un intervalle plus ancien, dans un
+  contrat qui commence plus tôt, garde le prix provisoire.
+
+## Conditions d’utilisation de l’AESO
+
+Les prix du pool sont des données de l’AESO. L’AESO permet un usage non
+commercial, personnel ou éducatif (<https://www.aeso.ca/legal>) ; les
+conditions d’utilisation du produit d’API s’acceptent à l’abonnement, et l’AESO
+peut refuser ou retirer une clé. Servez-vous de votre clé pour votre seul
+foyer : ne la partagez pas, ne partagez ni ne revendez les prix. La conversion
+des /MWh en /kWh et les créneaux de 30 minutes sont faits dans votre propre
+Gladys ; aucune donnée de l’AESO n’est livrée avec l’intégration. Chaque statut
+indique « Source : AESO ».
 
 ## Source et requêtes
 
@@ -109,16 +130,19 @@ statut, les prix sont toujours lus.
 
 ## Fuseau horaire
 
-L’Alberta garde UTC-6 toute l’année depuis le 1er novembre 2026. Les jours de
-règlement suivent la base des fuseaux horaires du Node.js de l’intégration
-(2026e ou plus récente connaît le changement) ; avec une plus ancienne, chaque
+L’Alberta garde UTC-6 toute l’année : légalement depuis le 18 juin 2026, et les
+horloges n’ont pas reculé le 1er novembre 2026. Les jours de règlement suivent
+la base des fuseaux horaires du Node.js de l’intégration (2026c ou plus récente
+connaît le changement) ; avec une plus ancienne, chaque
 heure d’hiver serait décalée d’une heure par rapport aux heures des Rocheuses de
 l’AESO : l’intégration ne demande alors rien et le dit. L’historique d’avant
 novembre 2026 garde ses jours de 23 et 25 heures.
 
 ## Statut
 
-Le statut de l’intégration montre la dernière heure réglée gardée, la dernière
+Le statut de l’intégration montre la dernière heure réglée gardée, une réponse
+illisible (des heures dont l’horaire ou le prix ne se lit pas alors qu’une heure
+attendue manque : non connecté, nouvel essai avec le délai croissant), la dernière
 vérification, la dernière erreur et la prochaine tentative, le calendrier non
 alimenté, le nombre de contrats sur le modèle, un `/data` impossible à écrire.
 `/data` illisible : relu toutes les 10 secondes, rien n’est demandé en
@@ -129,5 +153,7 @@ attendant. La configuration illisible dans Gladys : redemandée après
 
 - Jamais testée avec une vraie clé ni un vrai contrat.
 - Les corrections de l’AESO sur un jour déjà complet ne sont pas relues.
+- Un calendrier vidé côté Gladys (une base restaurée) est relu à chaque
+  connexion et les jours manquants sont renvoyés.
 - Aucun appareil, aucun déclencheur de scène : le prix sert à travers le
   contrat.

@@ -24,6 +24,10 @@ the contract, then recomputes the cost with the real price (a few minutes to an
 hour later; later if the integration was stopped). The current price shown by
 the dashboard is that provisional price.
 
+The pool prices are the AESO's data: personal, non-commercial use only, under
+the terms you accept when subscribing to the API product
+(<https://www.aeso.ca/legal>); never share the key nor the prices.
+
 Guides: [English](docs/en.md) · [Français](docs/fr.md).
 
 ## Development

@@ -28,7 +28,10 @@ const reasons = {
   network: { en: 'network error', fr: 'erreur réseau' },
   timeout: { en: 'no answer in time', fr: 'pas de réponse à temps' },
   too_large: { en: 'answer too large', fr: 'réponse trop grande' },
-  invalid: { en: 'unreadable answer', fr: 'réponse illisible' },
+  invalid: {
+    en: 'unreadable answer (hours whose times or prices do not read): the contracts count the provisional price meanwhile',
+    fr: 'réponse illisible (heures dont l’horaire ou le prix ne se lit pas) : les contrats comptent le prix provisoire en attendant',
+  },
 };
 export const reason = (code, lang) => (reasons[code] ?? reasons.invalid)[lang];
 export const REASON_CODES = Object.keys(reasons);

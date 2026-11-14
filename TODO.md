@@ -20,9 +20,10 @@
       requests a day here. A 403 "Out of call volume quota" pauses.
 - [ ] Never tried with a real Gladys contract: the template is checked by the
       core validator and its rule engine (test/manifest.test.js) only.
-- [ ] Alberta's permanent UTC-6 (tz 2026e): if the province or the AESO change
-      the settlement clock again, the MPT check refuses the rows (said in the
-      status as an unreadable answer). Keep `node:24-alpine` current.
+- [ ] Alberta's permanent UTC-6 (tz 2026c; by law since 2026-06-18, no
+      fall-back on 2026-11-01): if the province or the AESO change the
+      settlement clock again, the MPT check refuses the rows, which the status
+      shows as an unreadable answer (not connected, growing back-off). Keep `node:24-alpine` current.
 - [ ] Restructured Energy Market (REM): a new price cap, floor or settlement
       interval would need a review of MIN/MAX_PRICE_MWH and of the hourly
       model (the calendar key keeps its 30-minute granularity for ever).
@@ -38,7 +39,7 @@
   a delegated request always holds an interval whose hour is not settled, and
   fails whole (one cost per interval or none), so it would never be priced.
   The rule engine counts the component `fallback` instead, a **provisional
-  price the user must type** (required input, no default: never 0, never a
+  price the user must type** (required input, no default: never written by the module, never a
   guess of the module), and recomputes the costs when the calendar entry
   arrives (`changed_from`). Said in the template, the docs and the intro.
 - Calendar `spot-ca-ab` (no provider prefix), `thirty_minutes` (the pool
@@ -55,6 +56,10 @@
   is asked without it.
 - The tz database must know the 2026 change (`TZ_CURRENT`): otherwise nothing
   is asked (every winter hour would be an hour off).
+- Unreadable rows plus an expected hour lacking = an `invalid` failure (status
+  not connected, back-off): a changed format or clock is visible (review r1).
+- The calendar is read back at each connection (20 days a call) and a day
+  whose slots are not all there is sent again (review r1).
 - No device and no scene trigger in 0.1.0 (the price goes through the
   contract); `type: provider`.
 - `.github/workflows/ci.yml`: `timeout-minutes: 30` on both jobs (taken from

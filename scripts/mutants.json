@@ -262,5 +262,65 @@
     "file": "src/app.js",
     "from": "if (!DAY_PATTERN.test(day) || day < oldest || day > today) continue;",
     "to": "if (!DAY_PATTERN.test(day)) continue;"
+  },
+  {
+    "name": "r1 R1: future attemptAt in /data accepted",
+    "file": "src/app.js",
+    "from": "value > 0 && value <= now",
+    "to": "value > 0"
+  },
+  {
+    "name": "r1 R4: pause floor removed",
+    "file": "src/app.js",
+    "from": "Math.max(failure.retryAfter ?? PAUSE_DEFAULT, PAUSE_MIN)",
+    "to": "(failure.retryAfter ?? PAUSE_DEFAULT)"
+  },
+  {
+    "name": "r1 R6: backfill not capped at 400 days",
+    "file": "src/app.js",
+    "from": "return first < oldest ? oldest : first;",
+    "to": "return first;"
+  },
+  {
+    "name": "r1 R7: fetch without timeout",
+    "file": "src/http.js",
+    "from": "signal: AbortSignal.timeout(Math.max(1, timeout)),",
+    "to": ""
+  },
+  {
+    "name": "r1 R9: calendar batches not split",
+    "file": "src/app.js",
+    "from": "batch.length + entries.length > CALENDAR_BATCH && !(await flush())",
+    "to": "false"
+  },
+  {
+    "name": "r1 R12: refusal kept when the key changes",
+    "file": "src/app.js",
+    "from": "      if (this.refused) {\n        this.refused = undefined;",
+    "to": "      if (false) {\n        this.refused = undefined;"
+  },
+  {
+    "name": "r1 I1: unreadable hours a quiet success",
+    "file": "src/app.js",
+    "from": "if (answer.refused > 0 && !run.every((day) => this.done(day, expected))) {",
+    "to": "if (false) {"
+  },
+  {
+    "name": "r1 m3: lost calendar never sent again",
+    "file": "src/app.js",
+    "from": "if (!whole) delete this.sent[day];",
+    "to": ""
+  },
+  {
+    "name": "r1 m6: quota days ignored",
+    "file": "src/http.js",
+    "from": "Number(wait[1] ?? 0) * 24",
+    "to": "0"
+  },
+  {
+    "name": "r1 R8: button sends a malformed key",
+    "file": "src/app.js",
+    "from": "if (this.config.problem) return T[this.config.problem];",
+    "to": ""
   }
 ]

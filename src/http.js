@@ -126,9 +126,12 @@ export async function getJson(
     // runs out: a pause, not a refused key. Any other 403 is not a refusal either.
     const text = await shortText(response);
     if (/quota/i.test(text)) {
-      const wait = /replenished in (\d{1,2}):(\d\d):(\d\d)/i.exec(text);
+      // A .NET TimeSpan: "hh:mm:ss", or "d.hh:mm:ss" past a day.
+      const wait = /replenished in (?:(\d{1,3})\.)?(\d{1,2}):(\d\d):(\d\d)/i.exec(text);
       const retryAfter = wait
-        ? ((Number(wait[1]) * 60 + Number(wait[2])) * 60 + Number(wait[3])) * 1000
+        ? (((Number(wait[1] ?? 0) * 24 + Number(wait[2])) * 60 + Number(wait[3])) * 60 +
+            Number(wait[4])) *
+          1000
         : retryAfterMs(
             response.headers?.get?.('retry-after'),
             Number.isFinite(served) ? served : now(),
